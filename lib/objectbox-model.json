@@ -33,10 +33,41 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "2:6275006849892722633",
+      "lastPropertyId": "4:5224547398743552308",
+      "name": "TeamMember",
+      "properties": [
+        {
+          "id": "1:5079742640710249772",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:6393149296654824372",
+          "name": "playerId",
+          "indexId": "2:4646022466543221506",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:1614703684759733346",
+          "name": "teamId",
+          "type": 9
+        },
+        {
+          "id": "4:5224547398743552308",
+          "name": "teamName",
+          "type": 9
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "1:5574094097141227077",
-  "lastIndexId": "1:6160706795430400873",
+  "lastEntityId": "2:6275006849892722633",
+  "lastIndexId": "2:4646022466543221506",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

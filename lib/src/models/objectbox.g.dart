@@ -15,6 +15,7 @@ import 'package:objectbox/objectbox.dart' as obx;
 import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
 import 'team.dart';
+import 'team_member.dart';
 
 export 'package:objectbox/objectbox.dart'; // so that callers only have to import this file
 
@@ -48,6 +49,41 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(4, 3702111810584608286),
         name: 'teamCount',
         type: 6,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(2, 6275006849892722633),
+    name: 'TeamMember',
+    lastPropertyId: const obx_int.IdUid(4, 5224547398743552308),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 5079742640710249772),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 6393149296654824372),
+        name: 'playerId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(2, 4646022466543221506),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 1614703684759733346),
+        name: 'teamId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 5224547398743552308),
+        name: 'teamName',
+        type: 9,
         flags: 0,
       ),
     ],
@@ -99,8 +135,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(1, 5574094097141227077),
-    lastIndexId: const obx_int.IdUid(1, 6160706795430400873),
+    lastEntityId: const obx_int.IdUid(2, 6275006849892722633),
+    lastIndexId: const obx_int.IdUid(2, 4646022466543221506),
     lastRelationId: const obx_int.IdUid(0, 0),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [],
@@ -163,6 +199,54 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    TeamMember: obx_int.EntityDefinition<TeamMember>(
+      model: _entities[1],
+      toOneRelations: (TeamMember object) => [],
+      toManyRelations: (TeamMember object) => {},
+      getId: (TeamMember object) => object.id,
+      setId: (TeamMember object, int id) {
+        object.id = id;
+      },
+      objectToFB: (TeamMember object, fb.Builder fbb) {
+        final playerIdOffset = fbb.writeString(object.playerId);
+        final teamIdOffset = fbb.writeString(object.teamId);
+        final teamNameOffset = fbb.writeString(object.teamName);
+        fbb.startTable(5);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, playerIdOffset);
+        fbb.addOffset(2, teamIdOffset);
+        fbb.addOffset(3, teamNameOffset);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final playerIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final teamIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 8, '');
+        final teamNameParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 10, '');
+        final object = TeamMember(
+          id: idParam,
+          playerId: playerIdParam,
+          teamId: teamIdParam,
+          teamName: teamNameParam,
+        );
+
+        return object;
+      },
+    ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -186,5 +270,28 @@ class Team_ {
   /// See [Team.teamCount].
   static final teamCount = obx.QueryIntegerProperty<Team>(
     _entities[0].properties[3],
+  );
+}
+
+/// [TeamMember] entity fields to define ObjectBox queries.
+class TeamMember_ {
+  /// See [TeamMember.id].
+  static final id = obx.QueryIntegerProperty<TeamMember>(
+    _entities[1].properties[0],
+  );
+
+  /// See [TeamMember.playerId].
+  static final playerId = obx.QueryStringProperty<TeamMember>(
+    _entities[1].properties[1],
+  );
+
+  /// See [TeamMember.teamId].
+  static final teamId = obx.QueryStringProperty<TeamMember>(
+    _entities[1].properties[2],
+  );
+
+  /// See [TeamMember.teamName].
+  static final teamName = obx.QueryStringProperty<TeamMember>(
+    _entities[1].properties[3],
   );
 }
