@@ -64,10 +64,61 @@
         }
       ],
       "relations": []
+    },
+    {
+      "id": "3:2775877443378871095",
+      "lastPropertyId": "8:54153367472196813",
+      "name": "Match",
+      "properties": [
+        {
+          "id": "1:8124953642853590526",
+          "name": "id",
+          "type": 6,
+          "flags": 1
+        },
+        {
+          "id": "2:7122228267786482968",
+          "name": "matchId",
+          "indexId": "3:4379219791951689544",
+          "type": 9,
+          "flags": 2080
+        },
+        {
+          "id": "3:435300751899356130",
+          "name": "teamId1",
+          "type": 9
+        },
+        {
+          "id": "4:6487779178865299046",
+          "name": "teamId2",
+          "type": 9
+        },
+        {
+          "id": "5:720098033746807084",
+          "name": "tossWonBy",
+          "type": 9
+        },
+        {
+          "id": "6:1996007448253744580",
+          "name": "batBowlFlag",
+          "type": 6
+        },
+        {
+          "id": "7:6812028044889582585",
+          "name": "noballFlag",
+          "type": 6
+        },
+        {
+          "id": "8:54153367472196813",
+          "name": "wideFlag",
+          "type": 6
+        }
+      ],
+      "relations": []
     }
   ],
-  "lastEntityId": "2:6275006849892722633",
-  "lastIndexId": "2:4646022466543221506",
+  "lastEntityId": "3:2775877443378871095",
+  "lastIndexId": "3:4379219791951689544",
   "lastRelationId": "0:0",
   "lastSequenceId": "0:0",
   "modelVersion": 5,

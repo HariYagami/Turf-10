@@ -6,14 +6,15 @@
 // ignore_for_file: camel_case_types, depend_on_referenced_packages
 // coverage:ignore-file
 
-import 'dart:typed_data';
 
+import 'dart:typed_data';
 import 'package:flat_buffers/flat_buffers.dart' as fb;
 import 'package:objectbox/internal.dart'
     as obx_int; // generated code can access "internal" functionality
 import 'package:objectbox/objectbox.dart' as obx;
 import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
+import 'match.dart';
 import 'team.dart';
 import 'team_member.dart';
 
@@ -90,6 +91,65 @@ final _entities = <obx_int.ModelEntity>[
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
   ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(3, 2775877443378871095),
+    name: 'Match',
+    lastPropertyId: const obx_int.IdUid(8, 54153367472196813),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 8124953642853590526),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 7122228267786482968),
+        name: 'matchId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(3, 4379219791951689544),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 435300751899356130),
+        name: 'teamId1',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 6487779178865299046),
+        name: 'teamId2',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 720098033746807084),
+        name: 'tossWonBy',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 1996007448253744580),
+        name: 'batBowlFlag',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 6812028044889582585),
+        name: 'noballFlag',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 54153367472196813),
+        name: 'wideFlag',
+        type: 6,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
 ];
 
 /// Shortcut for [obx.Store.new] that passes [getObjectBoxModel] and for Flutter
@@ -135,8 +195,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(2, 6275006849892722633),
-    lastIndexId: const obx_int.IdUid(2, 4646022466543221506),
+    lastEntityId: const obx_int.IdUid(3, 2775877443378871095),
+    lastIndexId: const obx_int.IdUid(3, 4379219791951689544),
     lastRelationId: const obx_int.IdUid(0, 0),
     lastSequenceId: const obx_int.IdUid(0, 0),
     retiredEntityUids: const [],
@@ -247,6 +307,84 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    Match: obx_int.EntityDefinition<Match>(
+      model: _entities[2],
+      toOneRelations: (Match object) => [],
+      toManyRelations: (Match object) => {},
+      getId: (Match object) => object.id,
+      setId: (Match object, int id) {
+        object.id = id;
+      },
+      objectToFB: (Match object, fb.Builder fbb) {
+        final matchIdOffset = fbb.writeString(object.matchId);
+        final teamId1Offset = fbb.writeString(object.teamId1);
+        final teamId2Offset = fbb.writeString(object.teamId2);
+        final tossWonByOffset = fbb.writeString(object.tossWonBy);
+        fbb.startTable(9);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, matchIdOffset);
+        fbb.addOffset(2, teamId1Offset);
+        fbb.addOffset(3, teamId2Offset);
+        fbb.addOffset(4, tossWonByOffset);
+        fbb.addInt64(5, object.batBowlFlag);
+        fbb.addInt64(6, object.noballFlag);
+        fbb.addInt64(7, object.wideFlag);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final matchIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final teamId1Param = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 8, '');
+        final teamId2Param = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 10, '');
+        final tossWonByParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 12, '');
+        final batBowlFlagParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          0,
+        );
+        final noballFlagParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          0,
+        );
+        final wideFlagParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          18,
+          0,
+        );
+        final object = Match(
+          id: idParam,
+          matchId: matchIdParam,
+          teamId1: teamId1Param,
+          teamId2: teamId2Param,
+          tossWonBy: tossWonByParam,
+          batBowlFlag: batBowlFlagParam,
+          noballFlag: noballFlagParam,
+          wideFlag: wideFlagParam,
+        );
+
+        return object;
+      },
+    ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -293,5 +431,46 @@ class TeamMember_ {
   /// See [TeamMember.teamName].
   static final teamName = obx.QueryStringProperty<TeamMember>(
     _entities[1].properties[3],
+  );
+}
+
+/// [Match] entity fields to define ObjectBox queries.
+class Match_ {
+  /// See [Match.id].
+  static final id = obx.QueryIntegerProperty<Match>(_entities[2].properties[0]);
+
+  /// See [Match.matchId].
+  static final matchId = obx.QueryStringProperty<Match>(
+    _entities[2].properties[1],
+  );
+
+  /// See [Match.teamId1].
+  static final teamId1 = obx.QueryStringProperty<Match>(
+    _entities[2].properties[2],
+  );
+
+  /// See [Match.teamId2].
+  static final teamId2 = obx.QueryStringProperty<Match>(
+    _entities[2].properties[3],
+  );
+
+  /// See [Match.tossWonBy].
+  static final tossWonBy = obx.QueryStringProperty<Match>(
+    _entities[2].properties[4],
+  );
+
+  /// See [Match.batBowlFlag].
+  static final batBowlFlag = obx.QueryIntegerProperty<Match>(
+    _entities[2].properties[5],
+  );
+
+  /// See [Match.noballFlag].
+  static final noballFlag = obx.QueryIntegerProperty<Match>(
+    _entities[2].properties[6],
+  );
+
+  /// See [Match.wideFlag].
+  static final wideFlag = obx.QueryIntegerProperty<Match>(
+    _entities[2].properties[7],
   );
 }

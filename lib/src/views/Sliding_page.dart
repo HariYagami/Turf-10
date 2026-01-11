@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:TURF_TOWN_/src/CommonParameters/AppBackGround1/Appbg1.dart';
-import 'package:TURF_TOWN_/src/services/Phone_no.dart';
+import 'package:TURF_TOWN_/src/Screens/Phone_no.dart';
 
 
 class SlidingPage extends StatefulWidget {

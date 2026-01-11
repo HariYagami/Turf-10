@@ -3,6 +3,7 @@ import 'package:objectbox/objectbox.dart';
 import 'package:uuid/uuid.dart';
 import 'objectbox_helper.dart';
 
+
 @Entity()
 class Team {
   @Id()
