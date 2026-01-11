@@ -1,4 +1,5 @@
 import 'package:TURF_TOWN_/src/models/team_member.dart';
+import 'package:TURF_TOWN_/src/models/objectbox_helper.dart';
 
 /// Helper class for managing player storage operations using ObjectBox
 class PlayerStorage {
@@ -26,6 +27,11 @@ class PlayerStorage {
     if (player != null) {
       player.updateName(newName);
     }
+  }
+
+  /// Update a player object directly (for updating the TeamMember entity)
+  static void updatePlayer(TeamMember player) {
+    ObjectBoxHelper.teamMemberBox.put(player);
   }
 
   /// Delete a specific player

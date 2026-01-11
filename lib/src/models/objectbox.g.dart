@@ -6,8 +6,8 @@
 // ignore_for_file: camel_case_types, depend_on_referenced_packages
 // coverage:ignore-file
 
-
 import 'dart:typed_data';
+
 import 'package:flat_buffers/flat_buffers.dart' as fb;
 import 'package:objectbox/internal.dart'
     as obx_int; // generated code can access "internal" functionality
@@ -94,7 +94,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(3, 2775877443378871095),
     name: 'Match',
-    lastPropertyId: const obx_int.IdUid(8, 54153367472196813),
+    lastPropertyId: const obx_int.IdUid(9, 6693471586032238203),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -143,6 +143,12 @@ final _entities = <obx_int.ModelEntity>[
       obx_int.ModelProperty(
         id: const obx_int.IdUid(8, 54153367472196813),
         name: 'wideFlag',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(9, 6693471586032238203),
+        name: 'overs',
         type: 6,
         flags: 0,
       ),
@@ -320,7 +326,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final teamId1Offset = fbb.writeString(object.teamId1);
         final teamId2Offset = fbb.writeString(object.teamId2);
         final tossWonByOffset = fbb.writeString(object.tossWonBy);
-        fbb.startTable(9);
+        fbb.startTable(10);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, matchIdOffset);
         fbb.addOffset(2, teamId1Offset);
@@ -329,6 +335,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(5, object.batBowlFlag);
         fbb.addInt64(6, object.noballFlag);
         fbb.addInt64(7, object.wideFlag);
+        fbb.addInt64(8, object.overs);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -371,6 +378,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
           18,
           0,
         );
+        final oversParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          20,
+          0,
+        );
         final object = Match(
           id: idParam,
           matchId: matchIdParam,
@@ -380,6 +393,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           batBowlFlag: batBowlFlagParam,
           noballFlag: noballFlagParam,
           wideFlag: wideFlagParam,
+          overs: oversParam,
         );
 
         return object;
@@ -472,5 +486,10 @@ class Match_ {
   /// See [Match.wideFlag].
   static final wideFlag = obx.QueryIntegerProperty<Match>(
     _entities[2].properties[7],
+  );
+
+  /// See [Match.overs].
+  static final overs = obx.QueryIntegerProperty<Match>(
+    _entities[2].properties[8],
   );
 }

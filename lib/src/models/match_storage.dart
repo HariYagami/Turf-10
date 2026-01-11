@@ -10,6 +10,7 @@ class MatchStorage {
     required bool chooseToBat, // true = bat first, false = bowl first
     required bool allowNoball, // true = allow, false = don't allow
     required bool allowWide, // true = allow, false = don't allow
+    required int overs, // number of overs for the match
   }) {
     return Match.create(
       teamId1: teamId1,
@@ -18,6 +19,7 @@ class MatchStorage {
       batBowlFlag: chooseToBat ? 0 : 1,
       noballFlag: allowNoball ? 0 : 1,
       wideFlag: allowWide ? 0 : 1,
+      overs: overs,
     );
   }
 
@@ -108,6 +110,14 @@ class MatchStorage {
     }
   }
 
+  /// Update overs
+  static void updateOvers(String matchId, int overs) {
+    final match = Match.getByMatchId(matchId);
+    if (match != null) {
+      match.updateOvers(overs);
+    }
+  }
+
   /// Get match details as a map
   static Map<String, dynamic>? getMatchDetails(String matchId) {
     final match = Match.getByMatchId(matchId);
@@ -124,6 +134,7 @@ class MatchStorage {
       'chooseToBowl': match.isBowlingFirst,
       'noballAllowed': match.isNoballAllowed,
       'wideAllowed': match.isWideAllowed,
+      'overs': match.overs,
       'dbId': match.id,
     };
   }
@@ -138,6 +149,7 @@ class MatchStorage {
     final bowlingTeam = match.getBowlingTeamId();
     
     return '${match.matchId}: ${match.teamId1} vs ${match.teamId2}\n'
+           'Overs: ${match.overs}\n'
            'Toss: ${match.tossWonBy} won and $tossDecision\n'
            'Batting: $battingTeam | Bowling: $bowlingTeam\n'
            'No-ball: ${match.isNoballAllowed ? "Allowed" : "Not Allowed"} | '
@@ -230,6 +242,12 @@ class MatchStorage {
     return allMatches.take(limit).toList();
   }
 
+  /// Get matches by overs
+  static List<Match> getMatchesByOvers(int overs) {
+    final allMatches = Match.getAll();
+    return allMatches.where((match) => match.overs == overs).toList();
+  }
+
   /// Batch create matches
   static List<Match> batchCreateMatches(List<Map<String, dynamic>> matchDataList) {
     List<Match> createdMatches = [];
@@ -243,6 +261,7 @@ class MatchStorage {
           chooseToBat: matchData['chooseToBat'] ?? true,
           allowNoball: matchData['allowNoball'] ?? true,
           allowWide: matchData['allowWide'] ?? true,
+          overs: matchData['overs'] ?? 20,
         );
         createdMatches.add(match);
       } catch (e) {

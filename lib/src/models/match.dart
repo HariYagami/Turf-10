@@ -19,6 +19,7 @@ class Match {
   int batBowlFlag; // 0 = Bat first, 1 = Bowl first (decision by toss winner)
   int noballFlag; // 0 = No-ball allowed (true), 1 = No-ball not allowed (false)
   int wideFlag; // 0 = Wide allowed (true), 1 = Wide not allowed (false)
+  int overs; // Number of overs for the match
   
   Match({
     this.id = 0,
@@ -29,6 +30,7 @@ class Match {
     required this.batBowlFlag,
     required this.noballFlag,
     required this.wideFlag,
+    required this.overs,
   });
 
   // Static methods for database operations
@@ -41,6 +43,7 @@ class Match {
     required int batBowlFlag,
     required int noballFlag,
     required int wideFlag,
+    required int overs,
   }) {
     // Validate team IDs
     if (teamId1.trim().isEmpty || teamId2.trim().isEmpty) {
@@ -69,6 +72,11 @@ class Match {
       throw Exception('Wide flag must be 0 (allowed) or 1 (not allowed)');
     }
     
+    // Validate overs
+    if (overs <= 0) {
+      throw Exception('Overs must be greater than 0');
+    }
+    
     // Generate next matchId
     final matchId = _generateNextMatchId();
     
@@ -80,6 +88,7 @@ class Match {
       batBowlFlag: batBowlFlag,
       noballFlag: noballFlag,
       wideFlag: wideFlag,
+      overs: overs,
     );
     
     ObjectBoxHelper.matchBox.put(match);
@@ -244,6 +253,15 @@ class Match {
     save();
   }
   
+  /// Update overs
+  void updateOvers(int newOvers) {
+    if (newOvers <= 0) {
+      throw Exception('Overs must be greater than 0');
+    }
+    overs = newOvers;
+    save();
+  }
+  
   // Getter methods for better readability
   
   /// Returns true if toss winner chose to bat first
@@ -292,6 +310,7 @@ class Match {
   String toString() {
     return 'Match(id: $id, matchId: $matchId, team1: $teamId1, team2: $teamId2, '
            'tossWon: $tossWonBy, batBowl: ${isBattingFirst ? "Bat" : "Bowl"}, '
+           'overs: $overs, '
            'noball: ${isNoballAllowed ? "Allowed" : "Not Allowed"}, '
            'wide: ${isWideAllowed ? "Allowed" : "Not Allowed"})';
   }
@@ -307,6 +326,7 @@ class Match {
       'batBowlFlag': batBowlFlag,
       'noballFlag': noballFlag,
       'wideFlag': wideFlag,
+      'overs': overs,
     };
   }
 }

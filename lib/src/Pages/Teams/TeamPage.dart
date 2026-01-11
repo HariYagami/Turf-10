@@ -377,14 +377,19 @@ class _NewTeamsPageState extends State<NewTeamsPage> {
                   Navigator.pop(context);
                 },
               ),
-              _buildNavItem(
-                icon: Icons.group,
-                label: 'Teams',
-                isSelected: true,
-                onTap: () {
-                  // Already on this page
-                },
-              ),
+     _buildNavItem(
+  icon: Icons.group,
+  label: 'Teams',
+  isSelected: false,
+  onTap: () async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const NewTeamsPage()),
+    );
+    // Reload teams when returning from NewTeamsPage
+    _loadTeams();
+  },
+),
             ],
           ),
         ),
@@ -392,43 +397,43 @@ class _NewTeamsPageState extends State<NewTeamsPage> {
     );
   }
 
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF00C4FF).withOpacity(0.2) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? const Color(0xFF00C4FF) : Colors.white70,
-              size: 28,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? const Color(0xFF00C4FF) : Colors.white70,
-                fontSize: 12,
-                fontFamily: 'Poppins',
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
+ Widget _buildNavItem({
+  required IconData icon,
+  required String label,
+  required bool isSelected,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFF00C4FF).withOpacity(0.2) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
       ),
-    );
-  }
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isSelected ? const Color(0xFF00C4FF) : Colors.white70,
+            size: 28,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? const Color(0xFF00C4FF) : Colors.white70,
+              fontSize: 12,
+              fontFamily: 'Poppins',
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   Widget _buildHeader() {
     return Padding(
