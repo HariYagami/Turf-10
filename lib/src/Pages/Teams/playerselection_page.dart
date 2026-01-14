@@ -1,9 +1,15 @@
+import 'package:TURF_TOWN_/src/Pages/Teams/cricket_scorer_screen.dart';
+import 'package:TURF_TOWN_/src/models/batsman.dart';
+import 'package:TURF_TOWN_/src/models/bowler.dart';
+import 'package:TURF_TOWN_/src/models/innings.dart';
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/CommonParameters/AppBackGround1/Appbg1.dart';
 import 'package:TURF_TOWN_/src/models/match_storage.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
 import 'package:TURF_TOWN_/src/models/team_member.dart';
 import 'package:TURF_TOWN_/src/models/player_storage.dart';
+
+
 
 class SelectPlayersPage extends StatefulWidget {
   final String battingTeamName;
@@ -214,78 +220,130 @@ class _SelectPlayersPageState extends State<SelectPlayersPage> {
   }
 
   void _proceedToMatch() {
-    // Validate all selections
-    if (selectedStriker == null || selectedNonStriker == null || selectedBowler == null) {
-      _showSnackBar('Please select all players!', Colors.red);
-      return;
-    }
-    
-    if (selectedStriker == selectedNonStriker) {
-      _showSnackBar('Striker and Non-Striker cannot be the same!', Colors.red);
-      return;
-    }
-    
-    // Get player names for confirmation
-    final striker = TeamMember.getByPlayerId(selectedStriker!);
-    final nonStriker = TeamMember.getByPlayerId(selectedNonStriker!);
-    final bowler = TeamMember.getByPlayerId(selectedBowler!);
-    
-    // Show confirmation dialog
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C2026),
-        title: const Text(
-          'Confirm Players',
-          style: TextStyle(color: Colors.white, fontSize: 18),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Match ID: $currentMatchId',
-              style: const TextStyle(color: Color(0xFF00C4FF), fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Striker: ${striker?.teamName ?? "Unknown"}',
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Non-Striker: ${nonStriker?.teamName ?? "Unknown"}',
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Bowler: ${bowler?.teamName ?? "Unknown"}',
-              style: const TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+  // Validate all selections
+  if (selectedStriker == null || selectedNonStriker == null || selectedBowler == null) {
+    _showSnackBar('Please select all players!', Colors.red);
+    return;
+  }
+  
+  if (selectedStriker == selectedNonStriker) {
+    _showSnackBar('Striker and Non-Striker cannot be the same!', Colors.red);
+    return;
+  }
+  
+  if (currentMatchId == null || battingTeamId == null || bowlingTeamId == null) {
+    _showSnackBar('Match data not found!', Colors.red);
+    return;
+  }
+  
+  // Get player names for confirmation
+  final striker = TeamMember.getByPlayerId(selectedStriker!);
+  final nonStriker = TeamMember.getByPlayerId(selectedNonStriker!);
+  final bowler = TeamMember.getByPlayerId(selectedBowler!);
+  
+  // Show confirmation dialog
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF1C2026),
+      title: const Text(
+        'Confirm Players',
+        style: TextStyle(color: Colors.white, fontSize: 18),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Match ID: $currentMatchId',
+            style: const TextStyle(color: Color(0xFF00C4FF), fontWeight: FontWeight.bold),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00C4FF),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              // TODO: Navigate to scoring page with selected players
-              _showSnackBar('Starting match...', Colors.green);
-              // Here you would navigate to the actual match scoring page
-              // Navigator.push(context, MaterialPageRoute(builder: (context) => ScoringPage(...)));
-            },
-            child: const Text('Start', style: TextStyle(color: Colors.white)),
+          const SizedBox(height: 12),
+          Text(
+            'Striker: ${striker?.teamName ?? "Unknown"}',
+            style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Non-Striker: ${nonStriker?.teamName ?? "Unknown"}',
+            style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Bowler: ${bowler?.teamName ?? "Unknown"}',
+            style: const TextStyle(color: Colors.white),
           ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF00C4FF),
+          ),
+          onPressed: () {
+            Navigator.pop(context); // Close the dialog
+            _startMatch();
+          },
+          child: const Text('Start', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+
+void _startMatch() async {
+  try {
+    // Create FIRST innings for the match using the specific factory method
+    final innings = Innings.createFirstInnings(
+      matchId: currentMatchId!,
+      battingTeamId: battingTeamId!,
+      bowlingTeamId: bowlingTeamId!,
     );
+    
+    // Create batsmen records
+    final strikerBatsman = Batsman.create(
+      inningsId: innings.inningsId,
+      teamId: battingTeamId!,
+      playerId: selectedStriker!,
+    );
+    
+    final nonStrikerBatsman = Batsman.create(
+      inningsId: innings.inningsId,
+      teamId: battingTeamId!,
+      playerId: selectedNonStriker!,
+    );
+    
+    // Create bowler record
+    final bowler = Bowler.create(
+      inningsId: innings.inningsId,
+      teamId: bowlingTeamId!,
+      playerId: selectedBowler!,
+    );
+    
+    _showSnackBar('Starting match...', Colors.green);
+    
+    // Navigate to CricketScorerScreen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CricketScorerScreen(
+          matchId: currentMatchId!,
+          inningsId: innings.inningsId,
+          strikeBatsmanId: strikerBatsman.batId,
+          nonStrikeBatsmanId: nonStrikerBatsman.batId,
+          bowlerId: bowler.bowlerId,
+        ),
+      ),
+    );
+  } catch (e) {
+    _showSnackBar('Error starting match: $e', Colors.red);
+    print('Error in _startMatch: $e');
   }
+}
 
   void _showMatchDataDialog() {
     final allMatches = MatchStorage.getAllMatches();

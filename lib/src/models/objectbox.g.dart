@@ -14,7 +14,11 @@ import 'package:objectbox/internal.dart'
 import 'package:objectbox/objectbox.dart' as obx;
 import 'package:objectbox_flutter_libs/objectbox_flutter_libs.dart';
 
+import 'batsman.dart';
+import 'bowler.dart';
+import 'innings.dart';
 import 'match.dart';
+import 'score.dart';
 import 'team.dart';
 import 'team_member.dart';
 
@@ -156,6 +160,320 @@ final _entities = <obx_int.ModelEntity>[
     relations: <obx_int.ModelRelation>[],
     backlinks: <obx_int.ModelBacklink>[],
   ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(6, 5771647144167435778),
+    name: 'Batsman',
+    lastPropertyId: const obx_int.IdUid(13, 9131031781711442115),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 4088420572437734586),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 5640631295779945839),
+        name: 'batId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(4, 924819228298571192),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 5198926993010661947),
+        name: 'inningsId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 8818358932573555554),
+        name: 'teamId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 3876831412952137777),
+        name: 'playerId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 9147880345533708240),
+        name: 'runs',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 1810379703806973393),
+        name: 'ballsFaced',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 2813276278636518257),
+        name: 'fours',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(9, 4161774950214791860),
+        name: 'sixes',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 314884398396809609),
+        name: 'dotBalls',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(11, 4366601628030871965),
+        name: 'strikeRate',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(12, 6997263092257779014),
+        name: 'isOut',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 9131031781711442115),
+        name: 'bowlerIdWhoGotWicket',
+        type: 9,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(7, 7473172738024848619),
+    name: 'Bowler',
+    lastPropertyId: const obx_int.IdUid(10, 7119189378160382921),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 7874352462220614622),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 4026986851683655201),
+        name: 'bowlerId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(5, 1739940437194475752),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 3104446447273637171),
+        name: 'inningsId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 7122299040772577920),
+        name: 'teamId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 5888173803586527440),
+        name: 'playerId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 8197682045334121819),
+        name: 'runsConceded',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 1344794256961385713),
+        name: 'wickets',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 2616293871219319116),
+        name: 'balls',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(9, 2610485028050056484),
+        name: 'overs',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 7119189378160382921),
+        name: 'economy',
+        type: 8,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(8, 7490018871653303460),
+    name: 'Innings',
+    lastPropertyId: const obx_int.IdUid(8, 2265949672689670304),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 2297746571144772817),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 4303774017981575384),
+        name: 'inningsId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(6, 7791953388720753313),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 5351448730515500624),
+        name: 'matchId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 1168112261925355980),
+        name: 'battingTeamId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 1065986471536019314),
+        name: 'bowlingTeamId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 3955429731988226915),
+        name: 'inningsNumber',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 1940488668828531455),
+        name: 'targetRuns',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 2265949672689670304),
+        name: 'isCompleted',
+        type: 1,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
+  obx_int.ModelEntity(
+    id: const obx_int.IdUid(9, 8358748761775211892),
+    name: 'Score',
+    lastPropertyId: const obx_int.IdUid(14, 7138359152693567417),
+    flags: 0,
+    properties: <obx_int.ModelProperty>[
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(1, 3202345345881361355),
+        name: 'id',
+        type: 6,
+        flags: 1,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(2, 3245361999830721073),
+        name: 'inningsId',
+        type: 9,
+        flags: 2080,
+        indexId: const obx_int.IdUid(7, 3221213037615798870),
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(3, 2071220658591533711),
+        name: 'totalRuns',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(4, 7284969305712179306),
+        name: 'wickets',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(5, 5398473576071983016),
+        name: 'currentBall',
+        type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(6, 6077449271309245578),
+        name: 'overs',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(7, 315220103446382026),
+        name: 'crr',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(8, 5644832691181697744),
+        name: 'nrr',
+        type: 8,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(9, 2363153043465637192),
+        name: 'strikeBatsmanId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 7183824647872641577),
+        name: 'nonStrikeBatsmanId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(11, 1698108262597538264),
+        name: 'currentBowlerId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(12, 7607603083224785413),
+        name: 'nextBatsmanId',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(13, 3334566216581240055),
+        name: 'currentOverStr',
+        type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(14, 7138359152693567417),
+        name: 'currentOver',
+        type: 30,
+        flags: 0,
+      ),
+    ],
+    relations: <obx_int.ModelRelation>[],
+    backlinks: <obx_int.ModelBacklink>[],
+  ),
 ];
 
 /// Shortcut for [obx.Store.new] that passes [getObjectBoxModel] and for Flutter
@@ -201,13 +519,36 @@ obx_int.ModelDefinition getObjectBoxModel() {
     // Typically, this is done with `dart run build_runner build`.
     generatorVersion: obx_int.GeneratorVersion.v2025_12_16,
     entities: _entities,
-    lastEntityId: const obx_int.IdUid(3, 2775877443378871095),
-    lastIndexId: const obx_int.IdUid(3, 4379219791951689544),
+    lastEntityId: const obx_int.IdUid(9, 8358748761775211892),
+    lastIndexId: const obx_int.IdUid(7, 3221213037615798870),
     lastRelationId: const obx_int.IdUid(0, 0),
     lastSequenceId: const obx_int.IdUid(0, 0),
-    retiredEntityUids: const [],
+    retiredEntityUids: const [2285599034617305271, 3622902142917021616],
     retiredIndexUids: const [],
-    retiredPropertyUids: const [],
+    retiredPropertyUids: const [
+      6982731572652910135,
+      556078640248643897,
+      1553385970519105694,
+      588452271648312842,
+      1555250721491193804,
+      6067244635239923110,
+      4545569353083856083,
+      5107222025575713549,
+      9103280526824560048,
+      3357192801158175812,
+      3096019139704708429,
+      5344261324822257753,
+      9096136552656286300,
+      234305272241868740,
+      4121752052603204182,
+      4616243808073389807,
+      4767596332072826510,
+      4323890849868521161,
+      2610301113594069623,
+      1229282561226367546,
+      7397433782792417068,
+      1551266224985754926,
+    ],
     retiredRelationUids: const [],
     modelVersion: 5,
     modelVersionParserMinimum: 5,
@@ -399,6 +740,421 @@ obx_int.ModelDefinition getObjectBoxModel() {
         return object;
       },
     ),
+    Batsman: obx_int.EntityDefinition<Batsman>(
+      model: _entities[3],
+      toOneRelations: (Batsman object) => [],
+      toManyRelations: (Batsman object) => {},
+      getId: (Batsman object) => object.id,
+      setId: (Batsman object, int id) {
+        object.id = id;
+      },
+      objectToFB: (Batsman object, fb.Builder fbb) {
+        final batIdOffset = fbb.writeString(object.batId);
+        final inningsIdOffset = fbb.writeString(object.inningsId);
+        final teamIdOffset = fbb.writeString(object.teamId);
+        final playerIdOffset = fbb.writeString(object.playerId);
+        final bowlerIdWhoGotWicketOffset = object.bowlerIdWhoGotWicket == null
+            ? null
+            : fbb.writeString(object.bowlerIdWhoGotWicket!);
+        fbb.startTable(14);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, batIdOffset);
+        fbb.addOffset(2, inningsIdOffset);
+        fbb.addOffset(3, teamIdOffset);
+        fbb.addOffset(4, playerIdOffset);
+        fbb.addInt64(5, object.runs);
+        fbb.addInt64(6, object.ballsFaced);
+        fbb.addInt64(7, object.fours);
+        fbb.addInt64(8, object.sixes);
+        fbb.addInt64(9, object.dotBalls);
+        fbb.addFloat64(10, object.strikeRate);
+        fbb.addBool(11, object.isOut);
+        fbb.addOffset(12, bowlerIdWhoGotWicketOffset);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final batIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final inningsIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 8, '');
+        final teamIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 10, '');
+        final playerIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 12, '');
+        final runsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          0,
+        );
+        final ballsFacedParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          0,
+        );
+        final foursParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          18,
+          0,
+        );
+        final sixesParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          20,
+          0,
+        );
+        final dotBallsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          22,
+          0,
+        );
+        final strikeRateParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          24,
+          0,
+        );
+        final isOutParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          26,
+          false,
+        );
+        final bowlerIdWhoGotWicketParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 28);
+        final object = Batsman(
+          id: idParam,
+          batId: batIdParam,
+          inningsId: inningsIdParam,
+          teamId: teamIdParam,
+          playerId: playerIdParam,
+          runs: runsParam,
+          ballsFaced: ballsFacedParam,
+          fours: foursParam,
+          sixes: sixesParam,
+          dotBalls: dotBallsParam,
+          strikeRate: strikeRateParam,
+          isOut: isOutParam,
+          bowlerIdWhoGotWicket: bowlerIdWhoGotWicketParam,
+        );
+
+        return object;
+      },
+    ),
+    Bowler: obx_int.EntityDefinition<Bowler>(
+      model: _entities[4],
+      toOneRelations: (Bowler object) => [],
+      toManyRelations: (Bowler object) => {},
+      getId: (Bowler object) => object.id,
+      setId: (Bowler object, int id) {
+        object.id = id;
+      },
+      objectToFB: (Bowler object, fb.Builder fbb) {
+        final bowlerIdOffset = fbb.writeString(object.bowlerId);
+        final inningsIdOffset = fbb.writeString(object.inningsId);
+        final teamIdOffset = fbb.writeString(object.teamId);
+        final playerIdOffset = fbb.writeString(object.playerId);
+        fbb.startTable(11);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, bowlerIdOffset);
+        fbb.addOffset(2, inningsIdOffset);
+        fbb.addOffset(3, teamIdOffset);
+        fbb.addOffset(4, playerIdOffset);
+        fbb.addInt64(5, object.runsConceded);
+        fbb.addInt64(6, object.wickets);
+        fbb.addInt64(7, object.balls);
+        fbb.addFloat64(8, object.overs);
+        fbb.addFloat64(9, object.economy);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final bowlerIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final inningsIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 8, '');
+        final teamIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 10, '');
+        final playerIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 12, '');
+        final runsConcededParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          0,
+        );
+        final wicketsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          0,
+        );
+        final ballsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          18,
+          0,
+        );
+        final oversParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          20,
+          0,
+        );
+        final economyParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          22,
+          0,
+        );
+        final object = Bowler(
+          id: idParam,
+          bowlerId: bowlerIdParam,
+          inningsId: inningsIdParam,
+          teamId: teamIdParam,
+          playerId: playerIdParam,
+          runsConceded: runsConcededParam,
+          wickets: wicketsParam,
+          balls: ballsParam,
+          overs: oversParam,
+          economy: economyParam,
+        );
+
+        return object;
+      },
+    ),
+    Innings: obx_int.EntityDefinition<Innings>(
+      model: _entities[5],
+      toOneRelations: (Innings object) => [],
+      toManyRelations: (Innings object) => {},
+      getId: (Innings object) => object.id,
+      setId: (Innings object, int id) {
+        object.id = id;
+      },
+      objectToFB: (Innings object, fb.Builder fbb) {
+        final inningsIdOffset = fbb.writeString(object.inningsId);
+        final matchIdOffset = fbb.writeString(object.matchId);
+        final battingTeamIdOffset = fbb.writeString(object.battingTeamId);
+        final bowlingTeamIdOffset = fbb.writeString(object.bowlingTeamId);
+        fbb.startTable(9);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, inningsIdOffset);
+        fbb.addOffset(2, matchIdOffset);
+        fbb.addOffset(3, battingTeamIdOffset);
+        fbb.addOffset(4, bowlingTeamIdOffset);
+        fbb.addInt64(5, object.inningsNumber);
+        fbb.addInt64(6, object.targetRuns);
+        fbb.addBool(7, object.isCompleted);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final inningsIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final matchIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 8, '');
+        final battingTeamIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 10, '');
+        final bowlingTeamIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 12, '');
+        final inningsNumberParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          0,
+        );
+        final targetRunsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          0,
+        );
+        final isCompletedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          18,
+          false,
+        );
+        final object = Innings(
+          id: idParam,
+          inningsId: inningsIdParam,
+          matchId: matchIdParam,
+          battingTeamId: battingTeamIdParam,
+          bowlingTeamId: bowlingTeamIdParam,
+          inningsNumber: inningsNumberParam,
+          targetRuns: targetRunsParam,
+          isCompleted: isCompletedParam,
+        );
+
+        return object;
+      },
+    ),
+    Score: obx_int.EntityDefinition<Score>(
+      model: _entities[6],
+      toOneRelations: (Score object) => [],
+      toManyRelations: (Score object) => {},
+      getId: (Score object) => object.id,
+      setId: (Score object, int id) {
+        object.id = id;
+      },
+      objectToFB: (Score object, fb.Builder fbb) {
+        final inningsIdOffset = fbb.writeString(object.inningsId);
+        final strikeBatsmanIdOffset = fbb.writeString(object.strikeBatsmanId);
+        final nonStrikeBatsmanIdOffset = fbb.writeString(
+          object.nonStrikeBatsmanId,
+        );
+        final currentBowlerIdOffset = fbb.writeString(object.currentBowlerId);
+        final nextBatsmanIdOffset = fbb.writeString(object.nextBatsmanId);
+        final currentOverStrOffset = fbb.writeString(object.currentOverStr);
+        final currentOverOffset = fbb.writeList(
+          object.currentOver.map(fbb.writeString).toList(growable: false),
+        );
+        fbb.startTable(15);
+        fbb.addInt64(0, object.id);
+        fbb.addOffset(1, inningsIdOffset);
+        fbb.addInt64(2, object.totalRuns);
+        fbb.addInt64(3, object.wickets);
+        fbb.addInt64(4, object.currentBall);
+        fbb.addFloat64(5, object.overs);
+        fbb.addFloat64(6, object.crr);
+        fbb.addFloat64(7, object.nrr);
+        fbb.addOffset(8, strikeBatsmanIdOffset);
+        fbb.addOffset(9, nonStrikeBatsmanIdOffset);
+        fbb.addOffset(10, currentBowlerIdOffset);
+        fbb.addOffset(11, nextBatsmanIdOffset);
+        fbb.addOffset(12, currentOverStrOffset);
+        fbb.addOffset(13, currentOverOffset);
+        fbb.finish(fbb.endTable());
+        return object.id;
+      },
+      objectFromFB: (obx.Store store, ByteData fbData) {
+        final buffer = fb.BufferContext(fbData);
+        final rootOffset = buffer.derefObject(0);
+        final idParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          4,
+          0,
+        );
+        final inningsIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 6, '');
+        final totalRunsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          8,
+          0,
+        );
+        final wicketsParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          10,
+          0,
+        );
+        final currentBallParam = const fb.Int64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          12,
+          0,
+        );
+        final oversParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          14,
+          0,
+        );
+        final crrParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          16,
+          0,
+        );
+        final nrrParam = const fb.Float64Reader().vTableGet(
+          buffer,
+          rootOffset,
+          18,
+          0,
+        );
+        final strikeBatsmanIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 20, '');
+        final nonStrikeBatsmanIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 22, '');
+        final currentBowlerIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 24, '');
+        final nextBatsmanIdParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 26, '');
+        final currentOverStrParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGet(buffer, rootOffset, 28, '');
+        final object =
+            Score(
+                id: idParam,
+                inningsId: inningsIdParam,
+                totalRuns: totalRunsParam,
+                wickets: wicketsParam,
+                currentBall: currentBallParam,
+                overs: oversParam,
+                crr: crrParam,
+                nrr: nrrParam,
+                strikeBatsmanId: strikeBatsmanIdParam,
+                nonStrikeBatsmanId: nonStrikeBatsmanIdParam,
+                currentBowlerId: currentBowlerIdParam,
+                nextBatsmanId: nextBatsmanIdParam,
+                currentOverStr: currentOverStrParam,
+              )
+              ..currentOver = const fb.ListReader<String>(
+                fb.StringReader(asciiOptimization: true),
+                lazy: false,
+              ).vTableGet(buffer, rootOffset, 30, []);
+
+        return object;
+      },
+    ),
   };
 
   return obx_int.ModelDefinition(model, bindings);
@@ -491,5 +1247,236 @@ class Match_ {
   /// See [Match.overs].
   static final overs = obx.QueryIntegerProperty<Match>(
     _entities[2].properties[8],
+  );
+}
+
+/// [Batsman] entity fields to define ObjectBox queries.
+class Batsman_ {
+  /// See [Batsman.id].
+  static final id = obx.QueryIntegerProperty<Batsman>(
+    _entities[3].properties[0],
+  );
+
+  /// See [Batsman.batId].
+  static final batId = obx.QueryStringProperty<Batsman>(
+    _entities[3].properties[1],
+  );
+
+  /// See [Batsman.inningsId].
+  static final inningsId = obx.QueryStringProperty<Batsman>(
+    _entities[3].properties[2],
+  );
+
+  /// See [Batsman.teamId].
+  static final teamId = obx.QueryStringProperty<Batsman>(
+    _entities[3].properties[3],
+  );
+
+  /// See [Batsman.playerId].
+  static final playerId = obx.QueryStringProperty<Batsman>(
+    _entities[3].properties[4],
+  );
+
+  /// See [Batsman.runs].
+  static final runs = obx.QueryIntegerProperty<Batsman>(
+    _entities[3].properties[5],
+  );
+
+  /// See [Batsman.ballsFaced].
+  static final ballsFaced = obx.QueryIntegerProperty<Batsman>(
+    _entities[3].properties[6],
+  );
+
+  /// See [Batsman.fours].
+  static final fours = obx.QueryIntegerProperty<Batsman>(
+    _entities[3].properties[7],
+  );
+
+  /// See [Batsman.sixes].
+  static final sixes = obx.QueryIntegerProperty<Batsman>(
+    _entities[3].properties[8],
+  );
+
+  /// See [Batsman.dotBalls].
+  static final dotBalls = obx.QueryIntegerProperty<Batsman>(
+    _entities[3].properties[9],
+  );
+
+  /// See [Batsman.strikeRate].
+  static final strikeRate = obx.QueryDoubleProperty<Batsman>(
+    _entities[3].properties[10],
+  );
+
+  /// See [Batsman.isOut].
+  static final isOut = obx.QueryBooleanProperty<Batsman>(
+    _entities[3].properties[11],
+  );
+
+  /// See [Batsman.bowlerIdWhoGotWicket].
+  static final bowlerIdWhoGotWicket = obx.QueryStringProperty<Batsman>(
+    _entities[3].properties[12],
+  );
+}
+
+/// [Bowler] entity fields to define ObjectBox queries.
+class Bowler_ {
+  /// See [Bowler.id].
+  static final id = obx.QueryIntegerProperty<Bowler>(
+    _entities[4].properties[0],
+  );
+
+  /// See [Bowler.bowlerId].
+  static final bowlerId = obx.QueryStringProperty<Bowler>(
+    _entities[4].properties[1],
+  );
+
+  /// See [Bowler.inningsId].
+  static final inningsId = obx.QueryStringProperty<Bowler>(
+    _entities[4].properties[2],
+  );
+
+  /// See [Bowler.teamId].
+  static final teamId = obx.QueryStringProperty<Bowler>(
+    _entities[4].properties[3],
+  );
+
+  /// See [Bowler.playerId].
+  static final playerId = obx.QueryStringProperty<Bowler>(
+    _entities[4].properties[4],
+  );
+
+  /// See [Bowler.runsConceded].
+  static final runsConceded = obx.QueryIntegerProperty<Bowler>(
+    _entities[4].properties[5],
+  );
+
+  /// See [Bowler.wickets].
+  static final wickets = obx.QueryIntegerProperty<Bowler>(
+    _entities[4].properties[6],
+  );
+
+  /// See [Bowler.balls].
+  static final balls = obx.QueryIntegerProperty<Bowler>(
+    _entities[4].properties[7],
+  );
+
+  /// See [Bowler.overs].
+  static final overs = obx.QueryDoubleProperty<Bowler>(
+    _entities[4].properties[8],
+  );
+
+  /// See [Bowler.economy].
+  static final economy = obx.QueryDoubleProperty<Bowler>(
+    _entities[4].properties[9],
+  );
+}
+
+/// [Innings] entity fields to define ObjectBox queries.
+class Innings_ {
+  /// See [Innings.id].
+  static final id = obx.QueryIntegerProperty<Innings>(
+    _entities[5].properties[0],
+  );
+
+  /// See [Innings.inningsId].
+  static final inningsId = obx.QueryStringProperty<Innings>(
+    _entities[5].properties[1],
+  );
+
+  /// See [Innings.matchId].
+  static final matchId = obx.QueryStringProperty<Innings>(
+    _entities[5].properties[2],
+  );
+
+  /// See [Innings.battingTeamId].
+  static final battingTeamId = obx.QueryStringProperty<Innings>(
+    _entities[5].properties[3],
+  );
+
+  /// See [Innings.bowlingTeamId].
+  static final bowlingTeamId = obx.QueryStringProperty<Innings>(
+    _entities[5].properties[4],
+  );
+
+  /// See [Innings.inningsNumber].
+  static final inningsNumber = obx.QueryIntegerProperty<Innings>(
+    _entities[5].properties[5],
+  );
+
+  /// See [Innings.targetRuns].
+  static final targetRuns = obx.QueryIntegerProperty<Innings>(
+    _entities[5].properties[6],
+  );
+
+  /// See [Innings.isCompleted].
+  static final isCompleted = obx.QueryBooleanProperty<Innings>(
+    _entities[5].properties[7],
+  );
+}
+
+/// [Score] entity fields to define ObjectBox queries.
+class Score_ {
+  /// See [Score.id].
+  static final id = obx.QueryIntegerProperty<Score>(_entities[6].properties[0]);
+
+  /// See [Score.inningsId].
+  static final inningsId = obx.QueryStringProperty<Score>(
+    _entities[6].properties[1],
+  );
+
+  /// See [Score.totalRuns].
+  static final totalRuns = obx.QueryIntegerProperty<Score>(
+    _entities[6].properties[2],
+  );
+
+  /// See [Score.wickets].
+  static final wickets = obx.QueryIntegerProperty<Score>(
+    _entities[6].properties[3],
+  );
+
+  /// See [Score.currentBall].
+  static final currentBall = obx.QueryIntegerProperty<Score>(
+    _entities[6].properties[4],
+  );
+
+  /// See [Score.overs].
+  static final overs = obx.QueryDoubleProperty<Score>(
+    _entities[6].properties[5],
+  );
+
+  /// See [Score.crr].
+  static final crr = obx.QueryDoubleProperty<Score>(_entities[6].properties[6]);
+
+  /// See [Score.nrr].
+  static final nrr = obx.QueryDoubleProperty<Score>(_entities[6].properties[7]);
+
+  /// See [Score.strikeBatsmanId].
+  static final strikeBatsmanId = obx.QueryStringProperty<Score>(
+    _entities[6].properties[8],
+  );
+
+  /// See [Score.nonStrikeBatsmanId].
+  static final nonStrikeBatsmanId = obx.QueryStringProperty<Score>(
+    _entities[6].properties[9],
+  );
+
+  /// See [Score.currentBowlerId].
+  static final currentBowlerId = obx.QueryStringProperty<Score>(
+    _entities[6].properties[10],
+  );
+
+  /// See [Score.nextBatsmanId].
+  static final nextBatsmanId = obx.QueryStringProperty<Score>(
+    _entities[6].properties[11],
+  );
+
+  /// See [Score.currentOverStr].
+  static final currentOverStr = obx.QueryStringProperty<Score>(
+    _entities[6].properties[12],
+  );
+
+  /// See [Score.currentOver].
+  static final currentOver = obx.QueryStringVectorProperty<Score>(
+    _entities[6].properties[13],
   );
 }
