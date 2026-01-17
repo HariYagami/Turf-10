@@ -1,3 +1,4 @@
+com.example.features:xml/flutter_share_file_paths = 0x7f100001
 com.example.features:styleable/ViewBackgroundHelper = 0x7f0f0044
 com.example.features:styleable/TextAppearance = 0x7f0f0041
 com.example.features:styleable/SwitchPreferenceCompat = 0x7f0f0040
@@ -145,6 +146,7 @@ com.example.features:attr/finishPrimaryWithSecondary = 0x7f03009c
 com.example.features:style/TextAppearance.AppCompat.Inverse = 0x7f0e00e8
 com.example.features:style/RtlOverlay.Widget.AppCompat.PopupMenuItem.Title = 0x7f0e00d5
 com.example.features:style/TextAppearance.AppCompat.Display4 = 0x7f0e00e6
+com.example.features:xml/flutter_printing_file_paths = 0x7f100000
 com.example.features:style/TextAppearance.AppCompat.Display1 = 0x7f0e00e3
 com.example.features:styleable/ViewStubCompat = 0x7f0f0045
 com.example.features:style/TextAppearance.AppCompat.Caption = 0x7f0e00e2

@@ -10,6 +10,24 @@ class PlayerStorage {
       teamName: playerName,
     );
   }
+  // Add this method to your PlayerStorage class
+static bool isPlayerNameUnique(String teamId, String playerName, {String? excludePlayerId}) {
+  final existingPlayers = getPlayersByTeam(teamId);
+  
+  for (final player in existingPlayers) {
+    // Skip the current player when updating
+    if (excludePlayerId != null && player.playerId == excludePlayerId) {
+      continue;
+    }
+    
+    // Case-insensitive comparison
+    if (player.teamName.toLowerCase() == playerName.trim().toLowerCase()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
 
   /// Get all players for a specific team
   static List<TeamMember> getPlayersByTeam(String teamId) {

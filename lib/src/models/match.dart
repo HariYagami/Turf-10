@@ -1,7 +1,10 @@
 import 'package:TURF_TOWN_/src/models/objectbox.g.dart';
 import 'package:objectbox/objectbox.dart';
 import 'objectbox_helper.dart';
-
+import 'innings.dart';
+import 'score.dart';
+import 'team.dart';
+import 'match_history.dart';
 
 @Entity()
 class Match {
@@ -215,6 +218,69 @@ class Match {
   /// Delete the current match
   void delete() {
     ObjectBoxHelper.matchBox.remove(id);
+  }
+  
+  /// Save completed match to history
+  void saveToHistory() {
+    try {
+      final firstInnings = Innings.getFirstInnings(matchId);
+      final secondInnings = Innings.getSecondInnings(matchId);
+      
+      if (firstInnings == null || secondInnings == null) {
+        print('❌ Cannot save to history: Missing innings data');
+        return;
+      }
+      
+      final firstScore = Score.getByInningsId(firstInnings.inningsId);
+      final secondScore = Score.getByInningsId(secondInnings.inningsId);
+      
+      if (firstScore == null || secondScore == null) {
+        print('❌ Cannot save to history: Missing score data');
+        return;
+      }
+      
+      // Check if already saved to history
+      final existingHistory = MatchHistory.getByMatchId(matchId);
+      if (existingHistory != null) {
+        print('⚠️ Match already saved to history');
+        return;
+      }
+      
+      // Determine winner and result message
+      String result;
+      if (secondScore.totalRuns >= secondInnings.targetRuns) {
+        // Team batting second won
+        final team = Team.getById(secondInnings.battingTeamId);
+        final wicketsRemaining = 10 - secondScore.wickets;
+        result = '${team?.teamName ?? "Team B"} won by $wicketsRemaining wickets';
+      } else {
+        // Team batting first won
+        final team = Team.getById(firstInnings.battingTeamId);
+        final runsDifference = firstScore.totalRuns - secondScore.totalRuns;
+        result = '${team?.teamName ?? "Team A"} won by $runsDifference runs';
+      }
+      
+      // Create match history entry
+      MatchHistory.create(
+        matchId: matchId,
+        teamAId: teamId1,
+        teamBId: teamId2,
+        matchDate: DateTime.now(),
+        matchType: 'CRICKET',
+        team1Runs: firstScore.totalRuns,
+        team1Wickets: firstScore.wickets,
+        team1Overs: firstScore.overs,
+        team2Runs: secondScore.totalRuns,
+        team2Wickets: secondScore.wickets,
+        team2Overs: secondScore.overs,
+        result: result,
+        isCompleted: true,
+      );
+      
+      print('✅ Match saved to history successfully: $result');
+    } catch (e) {
+      print('❌ Error saving match to history: $e');
+    }
   }
   
   /// Update toss winner

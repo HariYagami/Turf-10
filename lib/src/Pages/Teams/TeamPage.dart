@@ -1,6 +1,36 @@
 import 'package:TURF_TOWN_/src/Pages/Teams/team_members_page.dart';
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
+class SmoothPageRoute extends PageRouteBuilder {
+  final Widget page;
+
+  SmoothPageRoute({required this.page})
+      : super(
+          pageBuilder: (context, animation, secondaryAnimation) => page,
+          transitionDuration: const Duration(milliseconds: 300),
+          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            // For reverse animation (going back), slide from left to right
+            final isReverse = animation.status == AnimationStatus.reverse;
+            final begin = isReverse ? const Offset(-1.0, 0.0) : const Offset(1.0, 0.0);
+            const end = Offset.zero;
+            const curve = Curves.easeInOutCubic;
+
+            var tween = Tween(begin: begin, end: end).chain(
+              CurveTween(curve: curve),
+            );
+            var offsetAnimation = animation.drive(tween);
+
+            return SlideTransition(
+              position: offsetAnimation,
+              child: FadeTransition(
+                opacity: animation,
+                child: child,
+              ),
+            );
+          },
+        );
+}
 
 class NewTeamsPage extends StatefulWidget {
   const NewTeamsPage({super.key});
@@ -316,9 +346,16 @@ class _NewTeamsPageState extends State<NewTeamsPage> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+ @override
+Widget build(BuildContext context) {
+  return GestureDetector(
+    onHorizontalDragEnd: (details) {
+      // Swipe right (velocity is positive) -> go back to Toss page
+      if (details.primaryVelocity != null && details.primaryVelocity! > 500) {
+        Navigator.pop(context);
+      }
+    },
+    child: Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -353,56 +390,51 @@ class _NewTeamsPageState extends State<NewTeamsPage> {
         child: const Icon(Icons.add, size: 32),
       ),
       bottomNavigationBar: _buildBottomNavBar(),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1C2026),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                icon: Icons.sports_cricket,
-                label: 'Toss',
-                isSelected: false,
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-     _buildNavItem(
-  icon: Icons.group,
-  label: 'Teams',
-  isSelected: false,
-  onTap: () async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const NewTeamsPage()),
-    );
-    // Reload teams when returning from NewTeamsPage
-    _loadTeams();
-  },
-),
-            ],
-          ),
+Widget _buildBottomNavBar() {
+  return Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFF1C2026),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.3),
+          blurRadius: 10,
+          offset: const Offset(0, -2),
+        ),
+      ],
+    ),
+    child: SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(
+              icon: Icons.sports_cricket,
+              label: 'Toss',
+              isSelected: false,
+              onTap: () {
+                Navigator.pop(context);  // Goes back with smooth animation
+              },
+            ),
+            _buildNavItem(
+              icon: Icons.group,
+              label: 'Teams',
+              isSelected: true,  // Changed to true - you're on Teams page
+              onTap: () {},  // Changed to empty - already on this page
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
- Widget _buildNavItem({
+// Keep your _buildNavItem method as is - no changes needed
+Widget _buildNavItem({
   required IconData icon,
   required String label,
   required bool isSelected,

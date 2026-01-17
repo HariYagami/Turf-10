@@ -58,6 +58,7 @@ class ObjectBoxHelper {
       print('   - Scores: ${_scoreBox!.count()}');
       print('   - Batsmen: ${_batsmanBox!.count()}');
       print('   - Bowlers: ${_bowlerBox!.count()}');
+      print('   - Match Histories: ${_matchHistoryBox!.count()}');
     } catch (e, stackTrace) {
       print('❌ Failed to initialize ObjectBox: $e');
       print('Stack trace: $stackTrace');
@@ -172,85 +173,102 @@ class ObjectBoxHelper {
   }
 
   /// Clear all data from database (use carefully!)
-  static void clearAllData() {
-    if (_teamBox != null && _teamMemberBox != null && _matchBox != null &&
-        _inningsBox != null && _scoreBox != null && _batsmanBox != null &&
-        _bowlerBox != null) {
-      _teamBox!.removeAll();
-      _teamMemberBox!.removeAll();
-      _matchBox!.removeAll();
-      _inningsBox!.removeAll();
-      _scoreBox!.removeAll();
-      _batsmanBox!.removeAll();
-      _bowlerBox!.removeAll();
-      print('🗑️ All data cleared from ObjectBox');
-    }
+/// Clear all data from database (use carefully!)
+static void clearAllData() {
+  if (_teamBox != null && _teamMemberBox != null && _matchBox != null &&
+      _inningsBox != null && _scoreBox != null && _batsmanBox != null &&
+      _bowlerBox != null && _matchHistoryBox != null) {
+    _teamBox!.removeAll();
+    _teamMemberBox!.removeAll();
+    _matchBox!.removeAll();
+    _inningsBox!.removeAll();
+    _scoreBox!.removeAll();
+    _batsmanBox!.removeAll();
+    _bowlerBox!.removeAll();
+    _matchHistoryBox!.removeAll();
+    print('🗑️ All data cleared from ObjectBox');
   }
+}
 
   /// Get database statistics
-  static Map<String, int> getStats() {
-    if (_teamBox == null || _teamMemberBox == null || _matchBox == null ||
-        _inningsBox == null || _scoreBox == null || _batsmanBox == null ||
-        _bowlerBox == null) {
-      return {
-        'teams': 0,
-        'teamMembers': 0,
-        'matches': 0,
-        'innings': 0,
-        'scores': 0,
-        'batsmen': 0,
-        'bowlers': 0,
-      };
-    }
-    
+  /// Get database statistics
+static Map<String, int> getStats() {
+  if (_teamBox == null || _teamMemberBox == null || _matchBox == null ||
+      _inningsBox == null || _scoreBox == null || _batsmanBox == null ||
+      _bowlerBox == null || _matchHistoryBox == null) {
     return {
-      'teams': _teamBox!.count(),
-      'teamMembers': _teamMemberBox!.count(),
-      'matches': _matchBox!.count(),
-      'innings': _inningsBox!.count(),
-      'scores': _scoreBox!.count(),
-      'batsmen': _batsmanBox!.count(),
-      'bowlers': _bowlerBox!.count(),
+      'teams': 0,
+      'teamMembers': 0,
+      'matches': 0,
+      'innings': 0,
+      'scores': 0,
+      'batsmen': 0,
+      'bowlers': 0,
+      'matchHistories': 0,
     };
   }
+  
+  return {
+    'teams': _teamBox!.count(),
+    'teamMembers': _teamMemberBox!.count(),
+    'matches': _matchBox!.count(),
+    'innings': _inningsBox!.count(),
+    'scores': _scoreBox!.count(),
+    'batsmen': _batsmanBox!.count(),
+    'bowlers': _bowlerBox!.count(),
+    'matchHistories': _matchHistoryBox!.count(),
+  };
+}
 
   /// Print database statistics
-  static void printStats() {
-    final stats = getStats();
-    print('📊 Database Statistics:');
-    print('   Teams: ${stats['teams']}');
-    print('   Team Members: ${stats['teamMembers']}');
-    print('   Matches: ${stats['matches']}');
-    print('   Innings: ${stats['innings']}');
-    print('   Scores: ${stats['scores']}');
-    print('   Batsmen: ${stats['batsmen']}');
-    print('   Bowlers: ${stats['bowlers']}');
-  }
+ /// Print database statistics
+static void printStats() {
+  final stats = getStats();
+  print('📊 Database Statistics:');
+  print('   Teams: ${stats['teams']}');
+  print('   Team Members: ${stats['teamMembers']}');
+  print('   Matches: ${stats['matches']}');
+  print('   Innings: ${stats['innings']}');
+  print('   Scores: ${stats['scores']}');
+  print('   Batsmen: ${stats['batsmen']}');
+  print('   Bowlers: ${stats['bowlers']}');
+  print('   Match Histories: ${stats['matchHistories']}');
+}
 
   /// Verify database integrity
-  static bool verifyIntegrity() {
-    try {
-      if (!isInitialized) return false;
-      
-      // Try basic operations
-      final teamCount = _teamBox!.count();
-      final memberCount = _teamMemberBox!.count();
-      final matchCount = _matchBox!.count();
-      final inningsCount = _inningsBox!.count();
-      final scoreCount = _scoreBox!.count();
-      final batsmanCount = _batsmanBox!.count();
-      final bowlerCount = _bowlerBox!.count();
-      
-      print('✅ Database integrity check passed');
-      print('   Teams: $teamCount, Members: $memberCount, Matches: $matchCount');
-      print('   Innings: $inningsCount, Scores: $scoreCount');
-      print('   Batsmen: $batsmanCount, Bowlers: $bowlerCount');
-      return true;
-    } catch (e) {
-      print('❌ Database integrity check failed: $e');
-      return false;
-    }
+ /// Verify database integrity
+static bool verifyIntegrity() {
+  try {
+    if (!isInitialized) return false;
+    
+    // Try basic operations
+    final teamCount = _teamBox!.count();
+    final memberCount = _teamMemberBox!.count();
+    final matchCount = _matchBox!.count();
+    final inningsCount = _inningsBox!.count();
+    final scoreCount = _scoreBox!.count();
+    final batsmanCount = _batsmanBox!.count();
+    final bowlerCount = _bowlerBox!.count();
+    final matchHistoryCount = _matchHistoryBox!.count();
+    
+    print('✅ Database integrity check passed');
+    print('   Teams: $teamCount, Members: $memberCount, Matches: $matchCount');
+    print('   Innings: $inningsCount, Scores: $scoreCount');
+    print('   Batsmen: $batsmanCount, Bowlers: $bowlerCount');
+    print('   Match Histories: $matchHistoryCount');
+    return true;
+  } catch (e) {
+    print('❌ Database integrity check failed: $e');
+    return false;
   }
+}
+/// Clear match history data
+static void clearMatchHistoryData() {
+  if (_matchHistoryBox != null) {
+    _matchHistoryBox!.removeAll();
+    print('🗑️ Match history data cleared from ObjectBox');
+  }
+}
 
   /// Clear only match data
   static void clearMatchData() {
@@ -309,30 +327,33 @@ class ObjectBoxHelper {
   }
 
   /// Get detailed statistics
-  static Map<String, dynamic> getDetailedStats() {
-    if (!isInitialized) {
-      return {
-        'initialized': false,
-        'teams': 0,
-        'teamMembers': 0,
-        'matches': 0,
-        'innings': 0,
-        'scores': 0,
-        'batsmen': 0,
-        'bowlers': 0,
-      };
-    }
-
+ /// Get detailed statistics
+static Map<String, dynamic> getDetailedStats() {
+  if (!isInitialized) {
     return {
-      'initialized': true,
-      'teams': _teamBox!.count(),
-      'teamMembers': _teamMemberBox!.count(),
-      'matches': _matchBox!.count(),
-      'innings': _inningsBox!.count(),
-      'scores': _scoreBox!.count(),
-      'batsmen': _batsmanBox!.count(),
-      'bowlers': _bowlerBox!.count(),
-      'storePath': _store!.directoryPath,
+      'initialized': false,
+      'teams': 0,
+      'teamMembers': 0,
+      'matches': 0,
+      'innings': 0,
+      'scores': 0,
+      'batsmen': 0,
+      'bowlers': 0,
+      'matchHistories': 0,
     };
   }
+
+  return {
+    'initialized': true,
+    'teams': _teamBox!.count(),
+    'teamMembers': _teamMemberBox!.count(),
+    'matches': _matchBox!.count(),
+    'innings': _inningsBox!.count(),
+    'scores': _scoreBox!.count(),
+    'batsmen': _batsmanBox!.count(),
+    'bowlers': _bowlerBox!.count(),
+    'matchHistories': _matchHistoryBox!.count(),
+    'storePath': _store!.directoryPath,
+  };
+}
 }

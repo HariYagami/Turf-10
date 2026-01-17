@@ -496,11 +496,11 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
         isEditingCount = false;
       });
       _initializePlayerFields(result);
-      _loadExistingPlayers(); // Load existing players after setting new count
+      _loadExistingPlayers();
     }
   }
 
-  // ✅ UPDATED: Now retains existing members and only adds new ones
+  // ✅ UPDATED: Added unique name validation
   void _savePlayers() {
     if (memberCount == null || memberCount! <= 0) {
       _showSnackBar('Please set member count first', Colors.orange);
@@ -509,6 +509,7 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
 
     List<String> playerNames = [];
     
+    // ✅ First pass: collect all names and check for empty fields
     for (var controller in playerControllers) {
       final name = controller.text.trim();
       if (name.isEmpty) {
@@ -518,15 +519,43 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       playerNames.add(name);
     }
 
+    // ✅ Check for duplicate names within the form (case-insensitive)
+    Set<String> uniqueNames = {};
+    for (var name in playerNames) {
+      final lowerName = name.toLowerCase();
+      if (uniqueNames.contains(lowerName)) {
+        _showSnackBar('Duplicate player name found: "$name"', Colors.orange);
+        return;
+      }
+      uniqueNames.add(lowerName);
+    }
+
     try {
       // Get existing players
       final existingPlayers = PlayerStorage.getPlayersByTeam(widget.team.teamId);
       final existingCount = existingPlayers.length;
       
       if (memberCount! > existingCount) {
-        // Adding new members - only add the extra ones
+        // Adding new members - check for duplicates with existing players
         final newMembersToAdd = playerNames.sublist(existingCount);
         
+        for (var playerName in newMembersToAdd) {
+          // ✅ Check if name already exists in the database for this team
+          bool isDuplicate = false;
+          for (var existingPlayer in existingPlayers) {
+            if (existingPlayer.teamName.toLowerCase() == playerName.toLowerCase()) {
+              isDuplicate = true;
+              break;
+            }
+          }
+          
+          if (isDuplicate) {
+            _showSnackBar('Player name "$playerName" already exists in this team', Colors.orange);
+            return;
+          }
+        }
+        
+        // All validations passed - add new players
         for (var playerName in newMembersToAdd) {
           PlayerStorage.addPlayer(widget.team.teamId, playerName);
         }
@@ -548,8 +577,23 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       } else {
         // Same count - update existing player names if changed
         bool hasChanges = false;
+        
         for (int i = 0; i < playerNames.length && i < existingPlayers.length; i++) {
           if (existingPlayers[i].teamName != playerNames[i]) {
+            // ✅ Check if the new name conflicts with other players (excluding current one)
+            bool isDuplicate = false;
+            for (int j = 0; j < existingPlayers.length; j++) {
+              if (i != j && existingPlayers[j].teamName.toLowerCase() == playerNames[i].toLowerCase()) {
+                isDuplicate = true;
+                break;
+              }
+            }
+            
+            if (isDuplicate) {
+              _showSnackBar('Player name "${playerNames[i]}" already exists in this team', Colors.orange);
+              return;
+            }
+            
             existingPlayers[i].teamName = playerNames[i];
             PlayerStorage.updatePlayer(existingPlayers[i]);
             hasChanges = true;

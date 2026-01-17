@@ -37,7 +37,6 @@ class SmoothPageRoute extends PageRouteBuilder {
           },
         );
 }
-
 void main() => runApp(const FigmaToCodeApp());
 
 class FigmaToCodeApp extends StatelessWidget {
@@ -100,6 +99,8 @@ class _TeamPageState extends State<TeamPage> {
       _showSnackBar('Error loading teams: $e', Colors.red);
     }
   }
+
+  
 
   void _showSnackBar(String message, Color backgroundColor) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -207,16 +208,26 @@ void didChangeDependencies() {
   }
 }
   @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) {
-          Navigator.pushAndRemoveUntil(
+Widget build(BuildContext context) {
+  return PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const Home()),
+          (route) => false,
+        );
+      }
+    },
+    child: GestureDetector(
+      onHorizontalDragEnd: (details) {
+        // Swipe left (velocity is negative) -> go to Teams page
+        if (details.primaryVelocity != null && details.primaryVelocity! < -500) {
+          Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const Home()),
-            (route) => false,
-          );
+            SmoothPageRoute(page: const NewTeamsPage()),
+          ).then((_) => _loadTeams());
         }
       },
       child: Scaffold(
@@ -254,8 +265,9 @@ void didChangeDependencies() {
         ),
         bottomNavigationBar: _buildBottomNavBar(),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTossPage() {
     return LayoutBuilder(
@@ -332,18 +344,18 @@ Widget _buildDrawer() {
             ],
           ),
         ),
-        ListTile(
-          leading: const Icon(Icons.group, color: Colors.white),
-          title: const Text('Teams', style: TextStyle(color: Colors.white)),
-          onTap: () async {
-            Navigator.pop(context);
-            await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const NewTeamsPage()),
-            );
-            _loadTeams();
-          },
-        ),
+      ListTile(
+  leading: const Icon(Icons.group, color: Colors.white),
+  title: const Text('Teams', style: TextStyle(color: Colors.white)),
+  onTap: () async {
+    Navigator.pop(context);
+    await Navigator.push(
+      context,
+      SmoothPageRoute(page: const NewTeamsPage()),  // Changed this line
+    );
+    _loadTeams();
+  },
+),
         ListTile(
           leading: const Icon(Icons.scoreboard, color: Colors.white),
           title: const Text('Scorecard', style: TextStyle(color: Colors.white)),
@@ -386,16 +398,15 @@ Widget _buildDrawer() {
                 isSelected: true,
                 onTap: () {},
               ),
-            _buildNavItem(
+     _buildNavItem(
   icon: Icons.group,
   label: 'Teams',
   isSelected: false,
   onTap: () async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => const NewTeamsPage()),
+      SmoothPageRoute(page: const NewTeamsPage()),  // Changed this line
     );
-    // Reload teams immediately when returning
     _loadTeams();
   },
 ),
