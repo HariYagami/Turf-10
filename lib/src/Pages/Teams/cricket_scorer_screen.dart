@@ -2488,11 +2488,13 @@ Widget build(BuildContext context) {
                       const SizedBox(height: 16),
 
                     // Action Buttons Row
+// Action Buttons Row - UPDATED WITH SWAP BUTTON
 Padding(
   padding: const EdgeInsets.symmetric(horizontal: 16),
   child: Row(
     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
     children: [
+      // Extras button
       GestureDetector(
         onTap: toggleExtrasOptions,
         child: Container(
@@ -2514,8 +2516,45 @@ Padding(
           ),
         ),
       ),
+      
+      // Wicket button
       _buildWicketButton(),
+      
+      // Swap button - NEW
+      GestureDetector(
+        onTap: swapPlayers,
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF00BCD4), Color(0xFF0097A7)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00BCD4).withOpacity(0.5),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.swap_horiz,
+              color: Colors.white,
+              size: 28,
+            ),
+          ),
+        ),
+      ),
+      
+      // Runout button
       _buildRunoutButton(),
+      
+      // Undo button
       GestureDetector(
         onTap: undoLastBall,
         child: Container(
