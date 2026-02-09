@@ -12,6 +12,7 @@ import 'package:TURF_TOWN_/src/views/Home.dart';
 import 'package:TURF_TOWN_/src/views/history_page.dart';
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/Pages/Teams/InitialTeamPage.dart' hide Appbg1;
+import 'package:lottie/lottie.dart';
 
 
 class CricketScorerScreen extends StatefulWidget {
@@ -56,6 +57,14 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> {
   int? pendingRunoutRuns;
   String? runoutBatsmanId;
 
+  // Lottie animation flags
+  bool _showBoundaryAnimation = false;
+  String? _boundaryAnimationType; // '4' or '6'
+  bool _showWicketAnimation = false;
+  bool _showDuckAnimation = false;
+  String? _lastDuckBatsman;
+  bool _showRunoutHighlight = false;
+  int _runoutHighlightIndex = 0;
 
 List<Map<String, dynamic>> actionHistory = [];
   String? lastOverBowlerId; 
@@ -535,6 +544,13 @@ void _showLeaveMatchDialog() {
     currentScore!.crr = currentScore!.overs > 0 ? (currentScore!.totalRuns / currentScore!.overs) : 0.0;
     currentScore!.save();
 
+    // Trigger boundary animations
+    if (runs == 4) {
+      _triggerBoundaryAnimation('4');
+    } else if (runs == 6) {
+      _triggerBoundaryAnimation('6');
+    }
+
     if (currentInnings != null && currentInnings!.isSecondInnings) {
       if (_checkSecondInningsVictory()) return;
     }
@@ -596,6 +612,14 @@ void _showLeaveMatchDialog() {
     strikeBatsman!.markAsOut(bowlerIdWhoGotWicket: currentBowler!.bowlerId);
     currentScore!.wickets++;
     currentBowler!.updateStats(0, true, extrasRuns: 0, countBall: true);
+
+    // Trigger wicket animation
+    _triggerWicketAnimation();
+
+    // Check for duck (0 runs)
+    if (strikeBatsman!.runs == 0) {
+      _triggerDuckAnimation(strikeBatsman!.batId);
+    }
 
     var tempOver = currentScore!.currentOver;
     tempOver.add('W');
@@ -789,6 +813,14 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
       dismissalType: 'runout',
       fielderIdWhoRanOut: fielderId,
     );
+
+    // Trigger runout highlight animation
+    _triggerRunoutHighlight(runoutBatsmanId);
+
+    // Check for duck on runout
+    if (runoutBatsman.runs == 0) {
+      _triggerDuckAnimation(runoutBatsmanId);
+    }
 
     // Update score
     currentScore!.totalRuns += runs;
@@ -1942,6 +1974,85 @@ void _resetCurrentOver() {
 if (currentScore == null) return;
 currentScore!.currentOver = [];
 }
+
+// Lottie Animation Methods
+void _triggerBoundaryAnimation(String animationType) {
+  setState(() {
+    _boundaryAnimationType = animationType; // '4' or '6'
+    _showBoundaryAnimation = true;
+  });
+
+  // Auto-hide after animation completes (1200ms)
+  Future.delayed(const Duration(milliseconds: 1200), () {
+    if (mounted) {
+      setState(() {
+        _showBoundaryAnimation = false;
+      });
+    }
+  });
+}
+
+void _triggerWicketAnimation() {
+  setState(() {
+    _showWicketAnimation = true;
+  });
+
+  // Auto-hide after animation completes (900ms)
+  Future.delayed(const Duration(milliseconds: 900), () {
+    if (mounted) {
+      setState(() {
+        _showWicketAnimation = false;
+      });
+    }
+  });
+}
+
+void _triggerDuckAnimation(String batsmanId) {
+  setState(() {
+    _lastDuckBatsman = batsmanId;
+    _showDuckAnimation = true;
+  });
+
+  // Auto-hide after animation completes (1000ms)
+  Future.delayed(const Duration(milliseconds: 1000), () {
+    if (mounted) {
+      setState(() {
+        _showDuckAnimation = false;
+      });
+    }
+  });
+}
+
+void _triggerRunoutHighlight(String batsmanId) {
+  setState(() {
+    _showRunoutHighlight = true;
+    _runoutHighlightIndex = 0;
+  });
+
+  // Cycle through highlight indices 0-6
+  int cycleCount = 0;
+  const int totalCycles = 7;
+  const Duration cycleDuration = Duration(milliseconds: 150);
+
+  Future.doWhile(() async {
+    await Future.delayed(cycleDuration);
+    if (mounted && cycleCount < totalCycles) {
+      setState(() {
+        _runoutHighlightIndex = cycleCount;
+      });
+      cycleCount++;
+      return true;
+    }
+    return false;
+  }).then((_) {
+    if (mounted) {
+      setState(() {
+        _showRunoutHighlight = false;
+      });
+    }
+  });
+}
+
 @override
 Widget build(BuildContext context) {
   if (isInitializing) {
@@ -1980,15 +2091,17 @@ Widget build(BuildContext context) {
       return false; // Prevents automatic pop
     },
     child: Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: Appbg1.mainGradient,
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Top Bar - FIXED: Only one header now
-              Padding(
+      body: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: Appbg1.mainGradient,
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // Top Bar - FIXED: Only one header now
+                  Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: _buildHeader(MediaQuery.of(context).size.width),
               ),
@@ -2588,6 +2701,75 @@ const SizedBox(height: 24),
             ],
           ),
         ),
+      ),
+          // Lottie Animation Overlays
+          if (_showBoundaryAnimation)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: AnimatedOpacity(
+                    opacity: 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: SizedBox(
+                      width: 200,
+                      height: 200,
+                      child: Lottie.asset(
+                        _boundaryAnimationType == '4'
+                            ? 'assets/images/Scored 4.lottie'
+                            : 'assets/images/SIX ANIMATION.lottie',
+                        fit: BoxFit.contain,
+                        repeat: false,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_showWicketAnimation)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Lottie.asset(
+                      'assets/images/CRICKET OUT ANIMATION.lottie',
+                      fit: BoxFit.contain,
+                      repeat: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (_showDuckAnimation)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: Lottie.asset(
+                      'assets/images/Duck Out.lottie',
+                      fit: BoxFit.contain,
+                      repeat: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     ),
   );
