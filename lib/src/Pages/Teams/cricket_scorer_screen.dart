@@ -1,18 +1,23 @@
+import 'dart:convert';
+import 'dart:async'; // Add this import
+import 'package:TURF_TOWN_/src/services/environment_service.dart'; // Add this
 import 'package:TURF_TOWN_/src/CommonParameters/AppBackGround1/Appbg1.dart';
+import 'package:TURF_TOWN_/src/Pages/Teams/match_graph_page.dart';
 import 'package:TURF_TOWN_/src/Pages/Teams/scoreboard_page.dart';
 import 'package:TURF_TOWN_/src/models/batsman.dart';
 import 'package:TURF_TOWN_/src/models/bowler.dart';
+
 import 'package:TURF_TOWN_/src/models/innings.dart';
 import 'package:TURF_TOWN_/src/models/match_history.dart';
 import 'package:TURF_TOWN_/src/models/score.dart';
 import 'package:TURF_TOWN_/src/models/team_member.dart';
 import 'package:TURF_TOWN_/src/models/match.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
+import 'package:TURF_TOWN_/src/services/bluetooth_service.dart';
 import 'package:TURF_TOWN_/src/views/Home.dart';
-import 'package:TURF_TOWN_/src/views/history_page.dart';
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/Pages/Teams/InitialTeamPage.dart' hide Appbg1;
-import 'package:lottie/lottie.dart';
+import 'package:TURF_TOWN_/src/widgets/cricket_animations.dart';
 
 
 class CricketScorerScreen extends StatefulWidget {
@@ -42,13 +47,13 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> {
   late Batsman? strikeBatsman;
   late Batsman? nonStrikeBatsman;
   late Bowler? currentBowler;
-  
+
   bool isInitializing = true;
   bool showExtrasOptions = false;
   bool isNoBall = false;
   bool isWide = false;
   bool isByes = false;
-  
+
   bool noBallEnabled = true;
   bool wideEnabled = true;
 
@@ -56,6 +61,12 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> {
   bool isRunout = false;
   int? pendingRunoutRuns;
   String? runoutBatsmanId;
+
+  // Match completion flag - freeze buttons when match is complete
+  bool isMatchComplete = false;
+
+  // ScrollController for focusing scorecard during runout
+  late ScrollController _scrollController;
 
   // Lottie animation flags
   bool _showBoundaryAnimation = false;
@@ -65,15 +76,50 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> {
   String? _lastDuckBatsman;
   bool _showRunoutHighlight = false;
   int _runoutHighlightIndex = 0;
+  bool _showVictoryAnimation = false;
+
+  // Runout mode blur and highlight - light blur (0.3) with teal tint
+  bool _isRunoutModeActive = false;
+
+  Timer? _ledUpdateTimer;
+final _envService = EnvironmentService();
 
 List<Map<String, dynamic>> actionHistory = [];
   String? lastOverBowlerId; 
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeMatch();
-  }
+@override
+void initState() {
+  super.initState();
+  _scrollController = ScrollController();
+  _initializeMatch();
+  
+  // 🔥 Initialize environment service for temperature
+  print('🚀 CricketScorerScreen: Initializing EnvironmentService...');
+  _envService.initialize();
+  
+  // 🧪 Test API immediately (remove this after confirming it works)
+  Future.delayed(const Duration(seconds: 1), () {
+    _envService.testWeatherAPI();
+  });
+  
+  // 🔥 Update LED time & temperature every 60 seconds
+  _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+    print('⏰ CricketScorerScreen: Periodic LED update triggered');
+    _updateLEDTimeAndTemp();
+  });
+  
+  // Initial LED update after 3 seconds (give time for weather to load)
+  Future.delayed(const Duration(seconds: 3), () {
+    print('🎬 CricketScorerScreen: Initial LED update');
+    _updateLEDTimeAndTemp();
+  });
+}
+ @override
+void dispose() {
+  _scrollController.dispose();
+  _ledUpdateTimer?.cancel(); // 🔥 Cancel timer
+  super.dispose();
+} 
 
   Future<void> _initializeMatch() async {
     try {
@@ -159,52 +205,159 @@ List<Map<String, dynamic>> actionHistory = [];
 
  void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
   currentInnings?.markCompleted();
-  
+
+  // Mark match as complete - freeze all buttons
+  setState(() {
+    isMatchComplete = true;
+  });
+
+  // Trigger victory animation
+  _triggerVictoryAnimation();
+
   // Save to match history
   _saveMatchToHistory(battingTeamWon, firstInningsScore);
-  
-  String message;
-  String title;
-  
-  if (battingTeamWon) {
-    final teamMembers = TeamMember.getByTeamId(currentInnings!.battingTeamId);
-    final totalTeamMembers = teamMembers.length;
-    int wicketsRemaining = (totalTeamMembers - 1) - currentScore!.wickets;
-    double oversRemaining = currentMatch!.overs - currentScore!.overs;
+
+  // 🔥 CLEAR LED DISPLAY IMMEDIATELY
+  _clearLEDDisplay();
+
+  // Auto-redirect to history page after 5 seconds (animation duration 2 seconds + 3 seconds wait)
+  Future.delayed(const Duration(seconds: 5), () {
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const Home()),
+        (route) => false,
+      );
+    }
+  });
+}
+// Save incomplete match to history as paused
+Future<void> _clearLEDDisplay() async {
+  try {
+    final bleService = BleManagerService();
     
-    title = '🎉 Victory!';
-    message = 'Team ${currentInnings!.battingTeamId} won by $wicketsRemaining wickets with ${oversRemaining.toStringAsFixed(1)} overs remaining!\n\n'
-        'Target: ${currentInnings!.targetRuns}\n'
-        'Scored: ${currentScore!.totalRuns}/${currentScore!.wickets}';
-  } else {
-    int runsDifference = currentInnings!.targetRuns - currentScore!.totalRuns - 1;
-    title = 'Match Over';
-    message = 'Team ${currentInnings!.bowlingTeamId} won by $runsDifference runs!\n\n'
-        'Target: ${currentInnings!.targetRuns}\n'
-        'Scored: ${currentScore!.totalRuns}/${currentScore!.wickets}';
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping LED clear.');
+      return;
+    }
+    
+    debugPrint('🧹 Clearing LED display...');
+    
+    // Fill entire display with black (clear screen)
+    final commands = [
+      'FILL 0 0 127 127 0 0 0',  // Clear entire 128x128 display
+    ];
+    
+    await bleService.sendRawCommands(commands);
+    
+    debugPrint('✅ LED display cleared');
+    
+  } catch (e) {
+    debugPrint('❌ LED clear failed: $e');
   }
-  
-  showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF1C1F24),
-      title: Text(title, style: const TextStyle(color: Colors.white)),
-      content: Text(message, style: const TextStyle(color: Color(0xFF9AA0A6))),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const Home()),
-              (route) => false,
-            );
-          },
-          child: const Text('View History', style: TextStyle(color: Color(0xFF6D7CFF))),
+}
+void _saveMatchState() {
+  try {
+    if (currentMatch == null || currentInnings == null || currentScore == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Match data not available'),
+          backgroundColor: Colors.red,
         ),
-      ],
-    ),
-  );
+      );
+      return;
+    }
+
+    // Get all innings data
+    final firstInnings = Innings.getFirstInnings(widget.matchId);
+    final secondInnings = Innings.getSecondInnings(widget.matchId);
+    final firstScore = firstInnings != null ? Score.getByInningsId(firstInnings.inningsId) : null;
+    final secondScore = secondInnings != null ? Score.getByInningsId(secondInnings.inningsId) : null;
+
+    // Serialize match state to JSON
+    final matchStateJson = jsonEncode({
+      'matchId': widget.matchId,
+      'inningsId': widget.inningsId,
+      'strikeBatsmanId': widget.strikeBatsmanId,
+      'nonStrikeBatsmanId': widget.nonStrikeBatsmanId,
+      'bowlerId': widget.bowlerId,
+      // First innings data
+      'firstInningsId': firstInnings?.inningsId,
+      'firstInningsTeamId': firstInnings?.battingTeamId,
+      'firstInningsRuns': firstScore?.totalRuns ?? 0,
+      'firstInningsWickets': firstScore?.wickets ?? 0,
+      'firstInningsOvers': firstScore?.overs ?? 0.0,
+      'firstInningsExtras': firstScore?.totalExtras ?? 0,
+      // Second innings data
+      'secondInningsId': secondInnings?.inningsId,
+      'secondInningsTeamId': secondInnings?.battingTeamId,
+      'secondInningsRuns': secondScore?.totalRuns ?? 0,
+      'secondInningsWickets': secondScore?.wickets ?? 0,
+      'secondInningsOvers': secondScore?.overs ?? 0.0,
+      'secondInningsExtras': secondScore?.totalExtras ?? 0,
+      'secondInningsTarget': secondInnings?.targetRuns ?? 0,
+      // Current match state
+      'isCompleted': false,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    // Save to match history as paused match
+    final existingHistory = MatchHistory.getByMatchId(widget.matchId);
+
+    if (existingHistory != null) {
+      // Update existing paused match
+      existingHistory.isPaused = true;
+      existingHistory.pausedState = matchStateJson;
+      existingHistory.result = 'Match Paused';
+      existingHistory.isCompleted = false;
+      existingHistory.save();
+    } else {
+      // Create new paused match history
+      MatchHistory.create(
+        matchId: widget.matchId,
+        teamAId: currentMatch!.teamId1,
+        teamBId: currentMatch!.teamId2,
+        matchDate: DateTime.now(),
+        matchType: 'CRICKET',
+        team1Runs: firstScore?.totalRuns ?? 0,
+        team1Wickets: firstScore?.wickets ?? 0,
+        team1Overs: firstScore?.overs ?? 0.0,
+        team2Runs: secondScore?.totalRuns ?? 0,
+        team2Wickets: secondScore?.wickets ?? 0,
+        team2Overs: secondScore?.overs ?? 0.0,
+        result: 'Match Paused',
+        isCompleted: false,
+        isPaused: true,
+        pausedState: matchStateJson,
+      );
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Match saved! You can resume it later.'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Navigate back after saving
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        Navigator.of(context).pop();
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const TeamPage()),
+          (route) => false,
+        );
+      }
+    });
+  } catch (e) {
+    print('Error saving match state: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Error saving match: $e'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
 }
 
 void _saveMatchToHistory(bool battingTeamWon, Score firstInningsScore) {
@@ -356,6 +509,11 @@ TextButton(
 
 
 void _showLeaveMatchDialog() {
+  // Dismiss blur overlay when back button is pressed
+  setState(() {
+    _isRunoutModeActive = false;
+  });
+
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
@@ -369,7 +527,7 @@ void _showLeaveMatchDialog() {
         ),
       ),
       content: const Text(
-        'Do you want to leave the match? All current progress will be lost.',
+        'What would you like to do?',
         style: TextStyle(
           color: Color(0xFF9AA0A6),
           fontSize: 14,
@@ -385,20 +543,51 @@ void _showLeaveMatchDialog() {
         ),
         ElevatedButton(
           style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6D7CFF),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          ),
+          onPressed: () {
+            Navigator.of(context).pop(); // Close dialog
+            
+            // 🔥 CLEAR LED DISPLAY BEFORE SAVING AND EXITING
+            _clearLEDDisplay();
+            
+            // Give time for LED to clear before saving
+            Future.delayed(const Duration(milliseconds: 500), () {
+              _saveMatchState(); // This will save and navigate
+            });
+          },
+          child: const Text(
+            'Save & Exit',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFFF3B3B),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
           onPressed: () {
             Navigator.of(context).pop(); // Close dialog
-            Navigator.of(context).pop(); // Go back from current screen
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => const TeamPage()),
-              (route) => false, // Remove all previous routes
-            );
+            
+            // 🔥 CLEAR LED DISPLAY BEFORE EXITING
+            _clearLEDDisplay();
+            
+            // Give time for LED to clear before navigating
+            Future.delayed(const Duration(milliseconds: 500), () {
+              Navigator.of(context).pop(); // Go back from current screen
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const TeamPage()),
+                (route) => false, // Remove all previous routes
+              );
+            });
           },
           child: const Text(
-            'Yes, Leave',
+            'Discard & Exit',
             style: TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
@@ -409,14 +598,20 @@ void _showLeaveMatchDialog() {
     ),
   );
 }
-
- void addRuns(int runs) {
+void addRuns(int runs) {
   if (currentScore == null || strikeBatsman == null || currentBowler == null) return;
 
   // Handle runout mode
   if (isRunout) {
     addRunout(runs);
     return;
+  }
+
+  // Dismiss blur overlay when any score is pressed (non-runout mode)
+  if (_isRunoutModeActive) {
+    setState(() {
+      _isRunoutModeActive = false;
+    });
   }
 
   setState(() {
@@ -544,6 +739,9 @@ void _showLeaveMatchDialog() {
     currentScore!.crr = currentScore!.overs > 0 ? (currentScore!.totalRuns / currentScore!.overs) : 0.0;
     currentScore!.save();
 
+    // UPDATE LED DISPLAY - ADD THIS
+    _updateLEDAfterScore();
+
     // Trigger boundary animations
     if (runs == 4) {
       _triggerBoundaryAnimation('4');
@@ -555,31 +753,41 @@ void _showLeaveMatchDialog() {
       if (_checkSecondInningsVictory()) return;
     }
 
-    if (countBallForBowler && currentScore!.currentBall % 6 == 0) {
-      if (runsInCurrentOver == 0) {
-        currentBowler!.incrementMaiden();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Maiden Over! 🎯'),
-            duration: Duration(seconds: 2),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-      
-      runsInCurrentOver = 0;
-      
-      if (runs % 2 == 0) _switchStrike();
-      if (_isInningsComplete()) {
-        _endInnings();
-        return;
-      }
-      _showChangeBowlerDialog();
-      _resetCurrentOver();
-    } else if (runs % 2 == 1 && !isByes && !isWide) {
-      _switchStrike();
-    }
-    
+   if (countBallForBowler && currentScore!.currentBall % 6 == 0) {
+  if (runsInCurrentOver == 0) {
+    currentBowler!.incrementMaiden();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Maiden Over! 🎯'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  runsInCurrentOver = 0;
+
+  // SWAP FOR EVEN RUNS AT END OF OVER
+  if (runs % 2 == 0) _switchStrike();
+  
+  if (_isInningsComplete()) {
+    _endInnings();
+    return;
+  }
+
+  _showChangeBowlerDialog();
+  _resetCurrentOver();
+  
+  // 🔥 UPDATE LED AFTER OVER COMPLETION AND STRIKE SWAP
+  _updateLEDAfterScore();
+  
+} else if (runs % 2 == 1 && !isByes && !isWide) {
+  // SWAP FOR ODD RUNS DURING OVER
+  _switchStrike();
+  
+  // 🔥 UPDATE LED IMMEDIATELY AFTER ODD RUN SWAP
+  _updateLEDAfterScore();
+}
     isNoBall = false;
     isWide = false;
     isByes = false;
@@ -597,12 +805,12 @@ void _showLeaveMatchDialog() {
       'nonStrikeBatsmanId': nonStrikeBatsman!.batId,
       'batsmanIsOut': strikeBatsman!.isOut,
       'batsmanBowlerWhoGotWicket': strikeBatsman!.bowlerIdWhoGotWicket,
-      'batsmanExtras': strikeBatsman!.extras, // NEW: Track extras
+      'batsmanExtras': strikeBatsman!.extras,
       'bowlerWickets': currentBowler!.wickets,
       'bowlerBalls': currentBowler!.balls,
       'bowlerRuns': currentBowler!.runsConceded,
       'bowlerMaidens': currentBowler!.maidens,
-      'bowlerExtras': currentBowler!.extras, // NEW: Track extras
+      'bowlerExtras': currentBowler!.extras,
       'runsInCurrentOver': runsInCurrentOver,
       'wickets': currentScore!.wickets,
       'currentBall': currentScore!.currentBall,
@@ -633,6 +841,8 @@ void _showLeaveMatchDialog() {
       
       if (currentScore!.wickets >= totalTeamMembers - 1) {
         currentScore!.save();
+        // UPDATE LED DISPLAY - ADD THIS
+        _updateLEDAfterScore();
         _endInnings();
         return;
       }
@@ -640,9 +850,16 @@ void _showLeaveMatchDialog() {
 
     if (_isInningsComplete()) {
       currentScore!.save();
+      // UPDATE LED DISPLAY - ADD THIS
+      _updateLEDAfterScore();
       _endInnings();
       return;
     }
+
+    currentScore!.save();
+    
+    // UPDATE LED DISPLAY - ADD THIS
+    _updateLEDAfterScore();
 
     _showSelectNextBatsmanDialog();
 
@@ -663,8 +880,6 @@ void _showLeaveMatchDialog() {
       _resetCurrentOver();
       _switchStrike();
     }
-
-    currentScore!.save();
   });
 }
 
@@ -839,6 +1054,9 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
     currentScore!.crr = currentScore!.overs > 0 ? (currentScore!.totalRuns / currentScore!.overs) : 0.0;
     currentScore!.save();
 
+    // UPDATE LED DISPLAY - ADD THIS
+    _updateLEDAfterScore();
+
     runsInCurrentOver += runs;
 
     // Check if innings is complete
@@ -895,34 +1113,27 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
       _resetCurrentOver();
     }
 
-    // Reset runout state - FIXED: Use 'this' to refer to class member variable
+    // Reset runout state
     isRunout = false;
     pendingRunoutRuns = null;
-    this.runoutBatsmanId = null;  // Access the class member, not the parameter
+    this.runoutBatsmanId = null;
   });
 }
 
  void _showSelectNextBatsmanDialog() {
   if (currentInnings == null) return;
 
-  // Get ALL batsmen from this innings (including those who are out)
   final allBatsmenInInnings = Batsman.getByInningsAndTeam(
     currentInnings!.inningsId,
     currentInnings!.battingTeamId,
   );
 
-  // Get team members
   final teamPlayers = TeamMember.getByTeamId(currentInnings!.battingTeamId);
-  
-  // Get player IDs who have already batted (either currently batting or already out)
   final playersWhoBatted = allBatsmenInInnings.map((b) => b.playerId).toSet();
-  
-  // Filter available players who haven't batted yet
   final availablePlayers = teamPlayers.where((p) => 
     !playersWhoBatted.contains(p.playerId)
   ).toList();
 
-  // If no new players available, innings should end (all out)
   if (availablePlayers.isEmpty) {
     currentScore!.save();
     _endInnings();
@@ -965,6 +1176,9 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
                   });
                   
                   Navigator.pop(context);
+                  
+                  // 🔥 ADD THIS - UPDATE LED IMMEDIATELY AFTER BATSMAN CHANGE
+                  _updateLEDAfterScore();
                 },
               );
             }).toList(),
@@ -974,7 +1188,6 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
     ),
   );
 }
-
  void _showChangeBowlerDialog() {
   if (currentInnings == null) return;
 
@@ -1177,8 +1390,13 @@ void _selectBowler(Map<String, dynamic> bowlerData) {
     runsInCurrentOver = 0;
     currentScore!.save();
   });
-}
   
+  // 🔥 ADD THIS - UPDATE LED IMMEDIATELY WHEN BOWLER CHANGES
+  Future.delayed(const Duration(milliseconds: 100), () {
+    _updateLEDAfterScore();
+  });
+}
+
   bool _isInningsComplete() {
     if (currentMatch == null || currentScore == null) return false;
     int totalBalls = currentMatch!.overs * 6;
@@ -1602,12 +1820,27 @@ void _finalizeSecondInnings(
     setState(() => isByes = !isByes);
   }
 
-  void swapPlayers() {
-    setState(() {
-      _switchStrike();
-      currentScore?.save();
-    });
-  }
+void swapPlayers() {
+  setState(() {
+    // Perform the strike switch
+    _switchStrike();
+    
+    // Save the updated score
+    currentScore?.save();
+  });
+  
+  // 🔥 UPDATE LED IMMEDIATELY AFTER SWAP
+  _updateLEDAfterScore();
+  
+  // Show brief feedback
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Players swapped ✓'),
+      duration: Duration(milliseconds: 800),
+      backgroundColor: Color(0xFF6D7CFF),
+    ),
+  );
+}
 
  void undoLastBall() {
   if (actionHistory.isEmpty) {
@@ -1843,6 +2076,164 @@ void _finalizeSecondInnings(
     );
   });
 }
+Future<void> _updateLEDAfterScore() async {
+  try {
+    final bleService = BleManagerService();
+    
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping LED update.');
+      return;
+    }
+    
+    debugPrint('📤 Updating LED display (atomic commands)...');
+    
+    // Get player names
+    final strikerPlayer = TeamMember.getByPlayerId(strikeBatsman!.playerId);
+    final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
+    
+    String truncateName(String name) {
+      final truncated = name.length > 6 ? name.substring(0, 6) : name;
+      return truncated.toUpperCase();
+    }
+    
+    final strikerName = truncateName(strikerPlayer?.teamName ?? 'BAT1');
+    final nonStrikerName = truncateName(nonStrikerPlayer?.teamName ?? 'BAT2');
+    
+    // ✅ FIXED: Use atomic CHANGE commands (clear + write in one operation)
+    
+    // Define fixed positions and widths
+    const int scoreRunsX = 50;
+    const int scoreRunsY = 30;
+    const int scoreRunsWidth = 35;
+    const int scoreRunsHeight = 18;
+    
+    const int scoreWicketsX = 104;
+    const int scoreWicketsY = 30;
+    const int scoreWicketsWidth = 33;
+    const int scoreWicketsHeight = 18;
+    
+    const int crrX = 29;
+    const int crrY = 50;
+    const int crrWidth = 26;
+    const int crrHeight = 10;
+    
+    const int oversX = 84;
+    const int oversY = 50;
+    const int oversWidth = 16;
+    const int oversHeight = 10;
+    
+    const int bowlerStatsX = 58;
+    const int bowlerStatsY = 60;
+    const int bowlerStatsWidth = 24;
+    const int bowlerStatsHeight = 10;
+    
+    const int bowlerOversX = 84;
+    const int bowlerOversY = 60;
+    const int bowlerOversWidth = 20;
+    const int bowlerOversHeight = 10;
+    
+    const int strikerNameX = 10;
+    const int strikerNameY = 76;
+    const int strikerNameWidth = 32;
+    const int strikerNameHeight = 10;
+    
+    const int strikerStatsX = 46;
+    const int strikerStatsY = 76;
+    const int strikerStatsWidth = 82;
+    const int strikerStatsHeight = 10;
+    
+    const int nonStrikerNameX = 10;
+    const int nonStrikerNameY = 85;
+    const int nonStrikerNameWidth = 32;
+    const int nonStrikerNameHeight = 10;
+    
+    const int nonStrikerStatsX = 46;
+    const int nonStrikerStatsY = 85;
+    const int nonStrikerStatsWidth = 82;
+    const int nonStrikerStatsHeight = 10;
+    
+    // Prepare data strings
+    final runs = currentScore!.totalRuns.toString();
+    final wickets = currentScore!.wickets.toString();
+    final overs = currentScore!.overs.toStringAsFixed(1);
+    final crr = currentScore!.crr.toStringAsFixed(2);
+    
+    final strikerRuns = strikeBatsman!.runs.toString();
+    final strikerBalls = strikeBatsman!.ballsFaced.toString();
+    final nonStrikerRuns = nonStrikeBatsman!.runs.toString();
+    final nonStrikerBalls = nonStrikeBatsman!.ballsFaced.toString();
+    
+    final bowlerWickets = currentBowler!.wickets.toString();
+    final bowlerRuns = currentBowler!.runsConceded.toString();
+    final bowlerOvers = currentBowler!.overs.toStringAsFixed(1);
+    
+    // ✅ ATOMIC CHANGE COMMANDS (clear + write in one operation)
+    final commands = [
+      'FILL 0 0 127 127 0 0 0',  // Clear entire display before sending new data
+      'CHANGE $scoreRunsX $scoreRunsY $scoreRunsWidth $scoreRunsHeight 2 255 255 255 $runs',
+      'CHANGE $scoreWicketsX $scoreWicketsY $scoreWicketsWidth $scoreWicketsHeight 2 255 255 255 $wickets',
+      'CHANGE $crrX $crrY $crrWidth $crrHeight 1 255 255 0 $crr',
+      'CHANGE $oversX $oversY $oversWidth $oversHeight 1 0 255 0 $overs',
+      'CHANGE $bowlerStatsX $bowlerStatsY $bowlerStatsWidth $bowlerStatsHeight 1 0 255 0 $bowlerWickets/$bowlerRuns',
+      'CHANGE $bowlerOversX $bowlerOversY $bowlerOversWidth $bowlerOversHeight 1 0 255 0 ($bowlerOvers)',
+      'CHANGE $strikerNameX $strikerNameY $strikerNameWidth $strikerNameHeight 1 255 255 255 $strikerName',
+      'CHANGE $strikerStatsX $strikerStatsY $strikerStatsWidth $strikerStatsHeight 1 200 255 200 $strikerRuns($strikerBalls)',
+      'CHANGE $nonStrikerNameX $nonStrikerNameY $nonStrikerNameWidth $nonStrikerNameHeight 1 200 200 255 $nonStrikerName',
+      'CHANGE $nonStrikerStatsX $nonStrikerStatsY $nonStrikerStatsWidth $nonStrikerStatsHeight 1 200 255 200 $nonStrikerRuns($nonStrikerBalls)',
+    ];
+    
+    await bleService.sendRawCommands(commands);
+    
+    debugPrint('✅ LED display updated - Runs: $runs/$wickets, Overs: $overs, CRR: $crr');
+    
+  } catch (e) {
+    debugPrint('❌ LED update failed: $e');
+  }
+}
+
+Future<void> _updateLEDTimeAndTemp() async {
+  try {
+    final bleService = BleManagerService();
+    
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping time/temp update.');
+      return;
+    }
+    
+    debugPrint('🕐 Updating time and temperature...');
+    
+    final now = DateTime.now();
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    
+    final temp = (_envService.currentTemperature ?? 27).round();
+    final tempStr = temp.toString();
+    
+    debugPrint('📊 Time: $timeStr | Temp: ${tempStr}°C');
+    
+    // ✅ ATOMIC CHANGE COMMANDS (from Doc 1)
+    const int timeX = 3;
+    const int timeY = 2;
+    const int timeWidth = 33;
+    const int timeHeight = 10;
+    
+    const int tempStartX = 102;
+    const int tempY = 2;
+    const int tempWidth = 12;
+    const int tempHeight = 10;
+    
+    final commands = [
+      'CHANGE $timeX $timeY $timeWidth $timeHeight 1 255 255 200 $timeStr',
+      'CHANGE $tempStartX $tempY $tempWidth $tempHeight 1 200 255 200 $tempStr',
+    ];
+    
+    await bleService.sendRawCommands(commands);
+    
+    debugPrint('✅ Time: $timeStr, Temp: ${tempStr}°C updated on LED');
+    
+  } catch (e) {
+    debugPrint('❌ Time/temp update failed: $e');
+  }
+}
 
 Widget _buildHeader(double w) {
   return Row(
@@ -1872,17 +2263,20 @@ Widget _buildHeader(double w) {
         ),
       ),
       // Trending up icon (Statistics)
-      IconButton(
-        icon: const Icon(Icons.trending_up, color: Colors.white, size: 28),
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Statistics feature coming soon'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        },
+    IconButton(
+  icon: const Icon(Icons.trending_up, color: Colors.white, size: 28),
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MatchGraphPage(
+          matchId: widget.matchId,
+          inningsId: widget.inningsId,
+        ),
       ),
+    );
+  },
+),
      // Scoreboard icon
 IconButton(
   icon: const Icon(Icons.scoreboard, color: Colors.white, size: 28),
@@ -1904,14 +2298,26 @@ IconButton(
 
 Widget _buildRunoutButton() {
   return GestureDetector(
-    onTap: () {
+    onTap: isMatchComplete ? null : () {
       setState(() {
         isRunout = !isRunout;  // Toggle runout mode
+        _isRunoutModeActive = isRunout;  // Activate blur overlay
         if (isRunout) {
           // Reset other extras when runout is activated
           isNoBall = false;
           isWide = false;
           isByes = false;
+
+          // Scroll to focus on scorecard when runout is activated
+          Future.delayed(const Duration(milliseconds: 100), () {
+            if (_scrollController.hasClients) {
+              _scrollController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+              );
+            }
+          });
         }
       });
     },
@@ -1934,6 +2340,14 @@ Widget _buildRunoutButton() {
             blurRadius: 10,
             spreadRadius: 2,
           ),
+          // Extra glow effect when runout mode is active
+          if (_isRunoutModeActive)
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 12,
+              spreadRadius: 2,
+              offset: const Offset(0, 0),
+            ),
         ],
       ),
       child: const Center(
@@ -1975,6 +2389,26 @@ if (currentScore == null) return;
 currentScore!.currentOver = [];
 }
 
+// Animation Builder - Choose animation based on type
+Widget _buildLottieAnimation(String assetPath) {
+  if (assetPath.contains('Scored 4')) {
+    return const BoundaryFourAnimation();
+  } else if (assetPath.contains('SIX')) {
+    return const BoundarySixAnimation();
+  } else if (assetPath.contains('CRICKET OUT') || assetPath.contains('Out')) {
+    return const WicketAnimation();
+  } else if (assetPath.contains('Duck')) {
+    return const DuckAnimation();
+  } else if (assetPath == 'victory') {
+    return const VictoryAnimation();
+  } else if (assetPath == 'over') {
+    return const BoundaryFourAnimation(); // Reuse 4 animation for over completion
+  }
+
+  // Fallback
+  return const SizedBox.shrink();
+}
+
 // Lottie Animation Methods
 void _triggerBoundaryAnimation(String animationType) {
   setState(() {
@@ -1997,8 +2431,8 @@ void _triggerWicketAnimation() {
     _showWicketAnimation = true;
   });
 
-  // Auto-hide after animation completes (900ms)
-  Future.delayed(const Duration(milliseconds: 900), () {
+  // Show animation for 3 seconds before showing dialog
+  Future.delayed(const Duration(seconds: 3), () {
     if (mounted) {
       setState(() {
         _showWicketAnimation = false;
@@ -2018,6 +2452,21 @@ void _triggerDuckAnimation(String batsmanId) {
     if (mounted) {
       setState(() {
         _showDuckAnimation = false;
+      });
+    }
+  });
+}
+
+void _triggerVictoryAnimation() {
+  setState(() {
+    _showVictoryAnimation = true;
+  });
+
+  // Show animation for 2 seconds before showing victory dialog
+  Future.delayed(const Duration(seconds: 2), () {
+    if (mounted) {
+      setState(() {
+        _showVictoryAnimation = false;
       });
     }
   });
@@ -2109,6 +2558,7 @@ Widget build(BuildContext context) {
               // Scrollable Content
               Expanded(
                 child: SingleChildScrollView(
+                  controller: _scrollController,
                   child: Column(
                     children: [
                       const SizedBox(height: 16),
@@ -2122,7 +2572,7 @@ Widget build(BuildContext context) {
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.black.withValues(alpha: 0.2),
                               blurRadius: 8,
                               spreadRadius: 1,
                             ),
@@ -2682,6 +3132,14 @@ Padding(
                 blurRadius: 8,
                 spreadRadius: 1,
               ),
+              // Glow effect when runout mode is active
+              if (_isRunoutModeActive)
+                BoxShadow(
+                  color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+                  blurRadius: 10,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 0),
+                ),
             ],
           ),
           child: const Center(
@@ -2702,7 +3160,7 @@ const SizedBox(height: 24),
           ),
         ),
       ),
-          // Lottie Animation Overlays
+          // Lottie Animation Overlays with Error Handling
           if (_showBoundaryAnimation)
             Positioned(
               top: 0,
@@ -2717,12 +3175,10 @@ const SizedBox(height: 24),
                     child: SizedBox(
                       width: 200,
                       height: 200,
-                      child: Lottie.asset(
+                      child: _buildLottieAnimation(
                         _boundaryAnimationType == '4'
                             ? 'assets/images/Scored 4.lottie'
                             : 'assets/images/SIX ANIMATION.lottie',
-                        fit: BoxFit.contain,
-                        repeat: false,
                       ),
                     ),
                   ),
@@ -2740,10 +3196,8 @@ const SizedBox(height: 24),
                   child: SizedBox(
                     width: 200,
                     height: 200,
-                    child: Lottie.asset(
+                    child: _buildLottieAnimation(
                       'assets/images/CRICKET OUT ANIMATION.lottie',
-                      fit: BoxFit.contain,
-                      repeat: false,
                     ),
                   ),
                 ),
@@ -2760,11 +3214,26 @@ const SizedBox(height: 24),
                   child: SizedBox(
                     width: 200,
                     height: 200,
-                    child: Lottie.asset(
+                    child: _buildLottieAnimation(
                       'assets/images/Duck Out.lottie',
-                      fit: BoxFit.contain,
-                      repeat: false,
                     ),
+                  ),
+                ),
+              ),
+            ),
+          // Victory Animation Overlay
+          if (_showVictoryAnimation)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                child: Center(
+                  child: SizedBox(
+                    width: 300,
+                    height: 300,
+                    child: _buildLottieAnimation('victory'),
                   ),
                 ),
               ),
@@ -2774,48 +3243,92 @@ const SizedBox(height: 24),
     ),
   );
 }
+
 Widget _buildRunButton(String label, int value) {
+  // Special styling for 4 and 6 buttons
+  bool isBoundaryButton = (value == 4 || value == 6);
+
   return GestureDetector(
-    onTap: () => addRuns(value),
+    onTap: isMatchComplete ? null : () => addRuns(value),
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      width: 50,
-      height: 65,
+      width: isBoundaryButton ? 56 : 50,
+      height: isBoundaryButton ? 71 : 65,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFFFFF), Color(0xFF6D7CFF), Color(0xFF2D3DFF)], // White to blue gradient for all
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        // Different gradients for boundary buttons (4 and 6)
+        gradient: isMatchComplete
+            ? const LinearGradient(
+                colors: [Color(0xFF666666), Color(0xFF555555), Color(0xFF444444)], // Gray for disabled
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : (value == 4
+                ? const LinearGradient(
+                    colors: [Color(0xFF26C6DA), Color(0xFF00BCD4), Color(0xFF0097A7)], // Soft teal/turquoise for 4
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : value == 6
+                    ? const LinearGradient(
+                        colors: [Color(0xFFCE93D8), Color(0xFFBA68C8), Color(0xFFAB47BC)], // Soft lavender/purple for 6
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFFFFFFFF), Color(0xFF6D7CFF), Color(0xFF2D3DFF)], // White to blue gradient for others
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF6D7CFF).withOpacity(0.4),
-            blurRadius: 10,
-            spreadRadius: 2,
+            color: isMatchComplete
+                ? Colors.black.withValues(alpha: 0.3)
+                : (isBoundaryButton
+                    ? (value == 4 ? const Color(0xFF26C6DA) : const Color(0xFFCE93D8)).withValues(alpha: 0.6)
+                    : const Color(0xFF6D7CFF).withValues(alpha: 0.4)),
+            blurRadius: isBoundaryButton ? 15 : 10,
+            spreadRadius: isBoundaryButton ? 3 : 2,
             offset: const Offset(0, 4),
           ),
+          // Glow effect when runout mode is active
+          if (_isRunoutModeActive)
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+              blurRadius: 12,
+              spreadRadius: 2,
+              offset: const Offset(0, 0),
+            ),
         ],
         border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
+          color: isMatchComplete
+              ? Colors.grey.withValues(alpha: 0.3)
+              : (_isRunoutModeActive
+                  ? const Color(0xFFFFD700).withValues(alpha: 0.9)  // Golden border when RO active
+                  : (isBoundaryButton
+                      ? Colors.white.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.3))),
+          width: _isRunoutModeActive ? 3 : (isBoundaryButton ? 2 : 1),  // Thicker border in RO mode
         ),
       ),
       child: Center(
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFFFFFFFF),
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            shadows: [
-              Shadow(
-                color: Colors.black26,
-                offset: Offset(1, 1),
-                blurRadius: 2,
-              ),
-            ],
+        child: Opacity(
+          opacity: isMatchComplete ? 0.5 : 1.0,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: const Color(0xFFFFFFFF),
+              fontSize: isBoundaryButton ? 26 : 24,
+              fontWeight: isBoundaryButton ? FontWeight.w900 : FontWeight.bold,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  offset: const Offset(1, 1),
+                  blurRadius: isBoundaryButton ? 3 : 2,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -2824,7 +3337,7 @@ Widget _buildRunButton(String label, int value) {
 }
 Widget _buildWicketButton() {
 return GestureDetector(
-onTap: addWicket,
+onTap: isMatchComplete ? null : addWicket,
 child: Container(
 width: 55,
 height: 55,
@@ -2840,6 +3353,14 @@ BoxShadow(
 color: const Color(0xFFFF0000).withOpacity(0.6),
 blurRadius: 10,
 spreadRadius: 2,
+),
+// Glow effect when runout mode is active
+if (_isRunoutModeActive)
+BoxShadow(
+color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+blurRadius: 12,
+spreadRadius: 2,
+offset: const Offset(0, 0),
 ),
 ],
 ),
@@ -2858,7 +3379,7 @@ fontWeight: FontWeight.bold,
 }
 Widget _buildExtrasButton(String label, bool isActive, VoidCallback onTap, {bool enabled = true}) {
 return GestureDetector(
-onTap: enabled ? onTap : null,
+onTap: (enabled && !isMatchComplete) ? onTap : null,
 child: Container(
 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
 decoration: BoxDecoration(
@@ -2876,6 +3397,16 @@ color: !enabled
 : Colors.white.withOpacity(0.3),
 width: 1.5,
 ),
+boxShadow: [
+// Glow effect when runout mode is active
+if (_isRunoutModeActive && !isMatchComplete)
+BoxShadow(
+color: const Color(0xFFFFD700).withValues(alpha: 0.8),
+blurRadius: 10,
+spreadRadius: 1,
+offset: const Offset(0, 0),
+),
+],
 ),
 child: Text(
 label,
