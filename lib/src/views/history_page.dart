@@ -1,4 +1,5 @@
 import 'package:TURF_TOWN_/src/Pages/Teams/scoreboard_page.dart';
+import 'package:TURF_TOWN_/src/Pages/Teams/cricket_scorer_screen.dart';
 import 'package:TURF_TOWN_/src/models/score.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -8,6 +9,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:TURF_TOWN_/src/models/match_history.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
@@ -23,10 +25,13 @@ class HistoryPage extends StatefulWidget {
   @override
   State<HistoryPage> createState() => _HistoryPageState();
 }
+enum MatchFilter { all, paused, completed }
 
 class _HistoryPageState extends State<HistoryPage> {
-  List<MatchHistory> _matchHistories = [];
+  List<MatchHistory> _completedMatches = [];
+  List<MatchHistory> _pausedMatches = [];
   bool _isLoading = true;
+   MatchFilter _selectedFilter = MatchFilter.all; 
 
   @override
   void initState() {
@@ -40,9 +45,11 @@ class _HistoryPageState extends State<HistoryPage> {
     });
 
     try {
-      final histories = MatchHistory.getAllCompleted();
+      final completed = MatchHistory.getAllCompleted();
+      final paused = MatchHistory.getPausedMatches();
       setState(() {
-        _matchHistories = histories;
+        _completedMatches = completed;
+        _pausedMatches = paused;
         _isLoading = false;
       });
     } catch (e) {
@@ -52,6 +59,7 @@ class _HistoryPageState extends State<HistoryPage> {
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -120,90 +128,166 @@ class _HistoryPageState extends State<HistoryPage> {
                 ),
               ),
 
-              // Recently Played Header with Shadow
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 0, vertical: 8),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2A2A4A),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.5),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Center(
-                  child: Text(
-                    'RECENTLY PLAYED',
+            // Filter Section
+Container(
+  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'FILTER MATCHES',
+        style: TextStyle(
+          color: Colors.white70,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 1.2,
+        ),
+      ),
+      const SizedBox(height: 10),
+      Row(
+        children: [
+          _buildFilterChip('All', MatchFilter.all),
+          const SizedBox(width: 10),
+          _buildFilterChip('Paused', MatchFilter.paused),
+          const SizedBox(width: 10),
+          _buildFilterChip('Completed', MatchFilter.completed),
+        ],
+      ),
+    ],
+  ),
+),
+
+// Matches List
+Expanded(
+  child: _isLoading
+      ? const Center(
+          child: CircularProgressIndicator(
+            valueColor:
+                AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        )
+      : (_pausedMatches.isEmpty && _completedMatches.isEmpty)
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.history,
+                    size: 64,
+                    color: Colors.white.withOpacity(0.3),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No match history yet',
                     style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.5,
+                      color: Colors.white.withOpacity(0.7),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Completed and paused matches will appear here',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.5),
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
               ),
-
-              // Matches List
-              Expanded(
-                child: _isLoading
-                    ? const Center(
-                        child: CircularProgressIndicator(
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
+            )
+          : RefreshIndicator(
+              onRefresh: () async {
+                _loadMatchHistories();
+              },
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  // Paused Matches Section
+                  if ((_selectedFilter == MatchFilter.all || _selectedFilter == MatchFilter.paused) && 
+                      _pausedMatches.isNotEmpty) ...[
+                    if (_selectedFilter == MatchFilter.all)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A4A),
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                      )
-                    : _matchHistories.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.history,
-                                  size: 64,
-                                  color: Colors.white.withOpacity(0.3),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'No match history yet',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Completed matches will appear here',
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : RefreshIndicator(
-                            onRefresh: () async {
-                              _loadMatchHistories();
-                            },
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: _matchHistories.length,
-                              itemBuilder: (context, index) {
-                                final matchHistory = _matchHistories[index];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildMatchHistoryCard(matchHistory),
-                                );
-                              },
+                        child: const Text(
+                          'PAUSED MATCHES - TAP TO RESUME',
+                          style: TextStyle(
+                            color: Color(0xFFFFD700),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    if (_selectedFilter == MatchFilter.all)
+                      const SizedBox(height: 12),
+                    ..._pausedMatches.map((match) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildPausedMatchCard(match),
+                    )),
+                    if (_selectedFilter == MatchFilter.all)
+                      const SizedBox(height: 24),
+                  ],
+                  
+                  // Completed Matches Section
+                  if ((_selectedFilter == MatchFilter.all || _selectedFilter == MatchFilter.completed) && 
+                      _completedMatches.isNotEmpty) ...[
+                    if (_selectedFilter == MatchFilter.all)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2A2A4A),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Text(
+                          'COMPLETED MATCHES',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    if (_selectedFilter == MatchFilter.all)
+                      const SizedBox(height: 12),
+                    ..._completedMatches.map((match) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildMatchHistoryCard(match),
+                    )),
+                  ],
+                  
+                  // Empty state when filter shows no results
+                  if ((_selectedFilter == MatchFilter.paused && _pausedMatches.isEmpty) ||
+                      (_selectedFilter == MatchFilter.completed && _completedMatches.isEmpty))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 100),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.filter_list_off,
+                            size: 64,
+                            color: Colors.white.withOpacity(0.3),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No ${_selectedFilter == MatchFilter.paused ? "paused" : "completed"} matches',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 16,
                             ),
                           ),
+                        ],
+                      ),
+                    ),
+                ],
               ),
+            ),
+),
             ],
           ),
         ),
@@ -341,6 +425,133 @@ class _HistoryPageState extends State<HistoryPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildPausedMatchCard(MatchHistory matchHistory) {
+    final teamA = Team.getById(matchHistory.teamAId);
+    final teamB = Team.getById(matchHistory.teamBId);
+    final team1Color = _getTeamColor(matchHistory.teamAId);
+    final team2Color = _getTeamColor(matchHistory.teamBId);
+
+    return GestureDetector(
+      onTap: () => _resumeMatch(matchHistory),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2C2C54),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFFFD700), width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFD700).withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Match Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  matchHistory.matchType.toUpperCase(),
+                  style: const TextStyle(
+                    color: Color(0xFFFFD700),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                const Icon(Icons.play_circle, color: Color(0xFFFFD700), size: 20),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // Teams
+            _buildTeamRow(
+              teamA?.teamName ?? 'Team A',
+              team1Color,
+              '${matchHistory.team1Runs}/${matchHistory.team1Wickets}',
+              '(${matchHistory.team1Overs.toStringAsFixed(1)})',
+            ),
+            const SizedBox(height: 10),
+            _buildTeamRow(
+              teamB?.teamName ?? 'Team B',
+              team2Color,
+              '${matchHistory.team2Runs}/${matchHistory.team2Wickets}',
+              '(${matchHistory.team2Overs.toStringAsFixed(1)})',
+            ),
+            const SizedBox(height: 12),
+
+            // Paused Status
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD700).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: const Color(0xFFFFD700), width: 1),
+              ),
+              child: const Text(
+                '⏸ PAUSED - TAP TO RESUME',
+                style: TextStyle(
+                  color: Color(0xFFFFD700),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _resumeMatch(MatchHistory matchHistory) {
+    if (matchHistory.pausedState == null || matchHistory.pausedState!.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error: Match state not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Parse paused state JSON to restore match details
+      final Map<String, dynamic> stateMap = jsonDecode(matchHistory.pausedState!);
+
+      final String inningsId = stateMap['inningsId'] ?? matchHistory.matchId;
+      final String strikeBatsmanId = stateMap['strikeBatsmanId'] ?? '';
+      final String nonStrikeBatsmanId = stateMap['nonStrikeBatsmanId'] ?? '';
+      final String bowlerId = stateMap['bowlerId'] ?? '';
+
+      // Navigate to cricket scorer with restored state
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CricketScorerScreen(
+            matchId: matchHistory.matchId,
+            inningsId: inningsId,
+            strikeBatsmanId: strikeBatsmanId,
+            nonStrikeBatsmanId: nonStrikeBatsmanId,
+            bowlerId: bowlerId,
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error parsing paused state: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error resuming match: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _navigateToScorecard(MatchHistory matchHistory) {
@@ -802,6 +1013,66 @@ pw.Widget _buildTableCell(String text, {bool isHeader = false}) {
         ),
       ),
     ],
+  );
+}
+Widget _buildFilterChip(String label, MatchFilter filter) {
+  final isSelected = _selectedFilter == filter;
+  int count = 0;
+  
+  if (filter == MatchFilter.paused) {
+    count = _pausedMatches.length;
+  } else if (filter == MatchFilter.completed) {
+    count = _completedMatches.length;
+  } else {
+    count = _pausedMatches.length + _completedMatches.length;
+  }
+  
+  return GestureDetector(
+    onTap: () {
+      setState(() {
+        _selectedFilter = filter;
+      });
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isSelected ? const Color(0xFFFFD700) : const Color(0xFF2A2A4A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected ? const Color(0xFFFFD700) : Colors.white24,
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.black : Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: isSelected ? Colors.black26 : Colors.white12,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              count.toString(),
+              style: TextStyle(
+                color: isSelected ? Colors.black : Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
   );
 }
   void _showDeleteConfirmation(MatchHistory matchHistory) {

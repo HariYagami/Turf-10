@@ -48,6 +48,7 @@ MERGED from [:share_plus] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar
 MERGED from [:shared_preferences_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\shared_preferences_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
 MERGED from [:geolocator_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\geolocator_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-15:12
 MERGED from [com.google.android.gms:play-services-location:21.2.0] C:\Users\Welcome\.gradle\caches\8.12\transforms\2bbe89de5c15bb27364063eb34adb881\transformed\jetified-play-services-location-21.2.0\AndroidManifest.xml:2:1-9:12
+MERGED from [:flutter_blue_plus_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\flutter_blue_plus_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-11:12
 MERGED from [:geocoding_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\geocoding_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
 MERGED from [:path_provider_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\path_provider_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
 MERGED from [:permission_handler_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\permission_handler_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:2:1-7:12
@@ -213,6 +214,8 @@ MERGED from [:geolocator_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravi
 MERGED from [:geolocator_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\geolocator_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.gms:play-services-location:21.2.0] C:\Users\Welcome\.gradle\caches\8.12\transforms\2bbe89de5c15bb27364063eb34adb881\transformed\jetified-play-services-location-21.2.0\AndroidManifest.xml:5:5-44
 MERGED from [com.google.android.gms:play-services-location:21.2.0] C:\Users\Welcome\.gradle\caches\8.12\transforms\2bbe89de5c15bb27364063eb34adb881\transformed\jetified-play-services-location-21.2.0\AndroidManifest.xml:5:5-44
+MERGED from [:flutter_blue_plus_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\flutter_blue_plus_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:5-44
+MERGED from [:flutter_blue_plus_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\flutter_blue_plus_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:9:5-44
 MERGED from [:geocoding_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\geocoding_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:geocoding_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\geocoding_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44
 MERGED from [:path_provider_android] D:\TURF_TOWN_-Aravind-kumar-k\TURF_TOWN_-Aravind-kumar-k\build\path_provider_android\intermediates\merged_manifest\debug\processDebugManifest\AndroidManifest.xml:5:5-44

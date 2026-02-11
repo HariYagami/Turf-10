@@ -91,29 +91,29 @@ List<Map<String, dynamic>> actionHistory = [];
 void initState() {
   super.initState();
   _scrollController = ScrollController();
-  _initializeMatch();
-  
-  // 🔥 Initialize environment service for temperature
+  _initializeMatch(); // ← _sendFullLEDLayout is called inside here
+
   print('🚀 CricketScorerScreen: Initializing EnvironmentService...');
   _envService.initialize();
-  
-  // 🧪 Test API immediately (remove this after confirming it works)
+
+  // Remove testWeatherAPI call after confirming it works
   Future.delayed(const Duration(seconds: 1), () {
     _envService.testWeatherAPI();
   });
-  
-  // 🔥 Update LED time & temperature every 60 seconds
+
+  // 🔥 Periodic time+temp update every 60 seconds
+  // (Full layout is drawn once at init — this only refreshes time/temp)
   _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
     print('⏰ CricketScorerScreen: Periodic LED update triggered');
     _updateLEDTimeAndTemp();
   });
-  
-  // Initial LED update after 3 seconds (give time for weather to load)
-  Future.delayed(const Duration(seconds: 3), () {
-    print('🎬 CricketScorerScreen: Initial LED update');
-    _updateLEDTimeAndTemp();
-  });
+
+  // ❌ REMOVED: Initial 3-second _updateLEDTimeAndTemp call
+  // _sendFullLEDLayout() inside _initializeMatch() handles the full draw
+  // including time and temp, so this was redundant and causing a
+  // partial-update race condition over the freshly drawn layout.
 }
+
  @override
 void dispose() {
   _scrollController.dispose();
@@ -121,39 +121,53 @@ void dispose() {
   super.dispose();
 } 
 
-  Future<void> _initializeMatch() async {
-    try {
-      currentMatch = Match.getByMatchId(widget.matchId);
-      if (currentMatch == null) throw Exception('Match not found');
-      
-      noBallEnabled = currentMatch!.isNoballAllowed;
-      wideEnabled = currentMatch!.isWideAllowed;
+Future<void> _initializeMatch() async {
+  try {
+    currentMatch = Match.getByMatchId(widget.matchId);
+    if (currentMatch == null) throw Exception('Match not found');
 
-      currentInnings = Innings.getByInningsId(widget.inningsId);
-      if (currentInnings == null) throw Exception('Innings not found');
+    noBallEnabled = currentMatch!.isNoballAllowed;
+    wideEnabled = currentMatch!.isWideAllowed;
 
-      currentScore = Score.getByInningsId(widget.inningsId);
-      if (currentScore == null) {
-        currentScore = Score.create(widget.inningsId);
-      }
+    currentInnings = Innings.getByInningsId(widget.inningsId);
+    if (currentInnings == null) throw Exception('Innings not found');
 
-      strikeBatsman = Batsman.getByBatId(widget.strikeBatsmanId);
-      nonStrikeBatsman = Batsman.getByBatId(widget.nonStrikeBatsmanId);
-      currentBowler = Bowler.getByBowlerId(widget.bowlerId);
-
-      if (currentScore != null) {
-        currentScore!.strikeBatsmanId = widget.strikeBatsmanId;
-        currentScore!.nonStrikeBatsmanId = widget.nonStrikeBatsmanId;
-        currentScore!.currentBowlerId = widget.bowlerId;
-        currentScore!.save();
-      }
-
-      setState(() => isInitializing = false);
-    } catch (e) {
-      print('Error initializing match: $e');
-      _showErrorDialog('Failed to load match: $e');
+    currentScore = Score.getByInningsId(widget.inningsId);
+    if (currentScore == null) {
+      currentScore = Score.create(widget.inningsId);
     }
+
+    strikeBatsman = Batsman.getByBatId(widget.strikeBatsmanId);
+    nonStrikeBatsman = Batsman.getByBatId(widget.nonStrikeBatsmanId);
+    currentBowler = Bowler.getByBowlerId(widget.bowlerId);
+
+    if (currentScore != null) {
+      currentScore!.strikeBatsmanId = widget.strikeBatsmanId;
+      currentScore!.nonStrikeBatsmanId = widget.nonStrikeBatsmanId;
+      currentScore!.currentBowlerId = widget.bowlerId;
+      currentScore!.save();
+    }
+
+    setState(() => isInitializing = false);
+
+    // 🔥 Second innings gets a special row-by-row intro draw.
+    // First innings gets the normal full layout draw.
+    final isSecond = currentInnings!.isSecondInnings;
+
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (isSecond) {
+        _sendSecondInningsIntroLayout();
+      } else {
+        _sendFullLEDLayout();
+      }
+    });
+
+  } catch (e) {
+    print('Error initializing match: $e');
+    _showErrorDialog('Failed to load match: $e');
   }
+}
+
 
   String _getBattingTeamName() {
     if (currentInnings == null) return 'Unknown';
@@ -202,6 +216,420 @@ void dispose() {
     }
     return false;
   }
+  /// Called once when CricketScorerScreen first loads.
+/// Clears the display and redraws the complete static + dynamic layout.
+Future<void> _sendFullLEDLayout() async {
+  try {
+    final bleService = BleManagerService();
+
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping full LED layout.');
+      return;
+    }
+
+    if (strikeBatsman == null || nonStrikeBatsman == null ||
+        currentBowler == null || currentScore == null ||
+        currentInnings == null) {
+      debugPrint('⚠️ Null data — skipping full LED layout.');
+      return;
+    }
+
+    debugPrint('🖥️ Drawing full LED layout...');
+
+    // ── STEP 1: CLEAR ────────────────────────────────────────────────────
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 800));
+
+    // ── STEP 2: PREPARE ALL DATA ─────────────────────────────────────────
+    final battingTeam      = Team.getById(currentInnings!.battingTeamId);
+    final bowlingTeam      = Team.getById(currentInnings!.bowlingTeamId);
+    final strikerPlayer    = TeamMember.getByPlayerId(strikeBatsman!.playerId);
+    final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
+    final bowlerPlayer     = TeamMember.getByPlayerId(currentBowler!.playerId);
+
+    final now     = DateTime.now();
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final temp    = (_envService.currentTemperature ?? 27).round();
+
+    String trunc(String? name, int max) {
+      final n = name ?? '';
+      return (n.length > max ? n.substring(0, max) : n).toUpperCase();
+    }
+    /// Calculates centered X position for text on the 128px wide LED display.
+/// charWidth: pixels per character (scale 1 = 6px, scale 2 = 12px, scale 3 = 18px)
+int _centerX(String text, int scale) {
+  const int displayWidth = 128;
+  final int textWidth = text.length * 6 * scale;
+  final int x = ((displayWidth - textWidth) / 2).round().clamp(0, displayWidth - 1);
+  return x;
+}
+
+/// Calculates X position so text ends at a given rightEdge pixel.
+int _rightAlignX(String text, int scale, int rightEdge) {
+  final int textWidth = text.length * 6 * scale;
+  return (rightEdge - textWidth).clamp(0, rightEdge);
+}
+
+    final battingName    = trunc(battingTeam?.teamName,        6);
+    final bowlingName    = trunc(bowlingTeam?.teamName,        6);
+    final strikerName    = trunc(strikerPlayer?.teamName,      7);
+    final nonStrikerName = trunc(nonStrikerPlayer?.teamName,   7);
+    final bowlerName     = trunc(bowlerPlayer?.teamName,       7);
+
+    final runs         = currentScore!.totalRuns.toString();
+    final wickets      = currentScore!.wickets.toString();
+    final overs        = currentScore!.overs.toStringAsFixed(1);
+    final crr          = currentScore!.crr.toStringAsFixed(2);
+    final strikerRuns  = strikeBatsman!.runs.toString();
+    final strikerBalls = strikeBatsman!.ballsFaced.toString();
+    final nsBatsRuns   = nonStrikeBatsman!.runs.toString();
+    final nsBatsBalls  = nonStrikeBatsman!.ballsFaced.toString();
+    final bowlerWkts   = currentBowler!.wickets.toString();
+    final bowlerRuns   = currentBowler!.runsConceded.toString();
+    final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
+
+    // ── ROW 1 (y=2): Header — time + org + temp ──────────────────────────
+    await bleService.sendRawCommands([
+      'TEXT 3 2 1 255 255 200 $timeStr',
+      'TEXT 36 2 1 200 200 255 AEROBIOSYS',
+      'TEXT 102 2 1 200 255 200 ${temp}C',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+   // ── ROW 2 (y=12+17): Divider + centered team names ───────────────────
+    // Layout: [battingName] [VS] [bowlingName] centered as a group
+    // Total group width = battingName + " VS " + bowlingName
+    // Each char at scale 1 = 6px wide
+    const int charW = 6;
+    const int displayW = 128;
+    const int vsGap = 4; // extra padding pixels each side of VS
+
+    final int batW    = battingName.length  * charW;
+    final int bowlW   = bowlingName.length  * charW;
+    const int vsW     = 2 * charW; // "VS" = 2 chars
+    final int totalW  = batW + vsGap + vsW + vsGap + bowlW;
+    final int groupX  = ((displayW - totalW) / 2).round().clamp(0, displayW - 1);
+
+    final int batX    = groupX;
+    final int vsX     = groupX + batW + vsGap;
+    final int bowlX   = vsX + vsW + vsGap;
+
+    await bleService.sendRawCommands([
+      'LINE H 0 12 127 12 1 255 255 255',
+      'TEXT $batX 17 1 0 255 255 $battingName',
+      'TEXT $vsX 17 1 255 255 255 VS',
+      'TEXT $bowlX 17 1 255 100 100 $bowlingName',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ── ROW 3 (y=30): Score ───────────────────────────────────────────────
+    await bleService.sendRawCommands([
+      'TEXT 5 30 2 255 0 255 SCR:',
+      'TEXT 50 30 2 255 255 255 $runs',
+      'TEXT 88 26 3 255 100 100 /',
+      'TEXT 105 30 2 255 255 255 $wickets',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ── ROW 4 (y=50): CRR + Overs ────────────────────────────────────────
+    await bleService.sendRawCommands([
+      'TEXT 5 50 1 255 255 0 CRR:',
+      'TEXT 29 50 1 255 255 0 $crr',
+      'TEXT 60 50 1 0 255 0 OVR:',
+      'TEXT 84 50 1 0 255 0 $overs',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ── ROW 5 (y=60): Bowler ─────────────────────────────────────────────
+    await bleService.sendRawCommands([
+      'TEXT 10 60 1 255 200 200 $bowlerName',
+      'TEXT 58 60 1 0 255 0 $bowlerWkts',
+      'TEXT 64 60 1 0 255 0 /',
+      'TEXT 70 60 1 0 255 0 $bowlerRuns',
+      'TEXT 82 60 1 0 255 0 ($bowlerOvers)',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ── ROW 6 (y=70+74+84): Divider + batsmen ────────────────────────────
+    await bleService.sendRawCommands([
+      'LINE H 0 70 127 70 1 255 255 255',
+      'TEXT 2 74 1 255 0 0 *',
+      'TEXT 8 74 1 200 255 255 $strikerName',
+      'TEXT 58 74 1 200 255 200 $strikerRuns($strikerBalls)',
+      'TEXT 8 84 1 200 200 255 $nonStrikerName',
+      'TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
+    ]);
+
+    debugPrint('✅ Full LED layout drawn');
+
+  } catch (e) {
+    debugPrint('❌ _sendFullLEDLayout failed: $e');
+  }
+}
+
+/// Called only when second innings loads.
+/// Shows a 3-second first innings summary screen, then draws the
+/// second innings layout row-by-row from top to bottom at 150ms per row.
+/// Called only when second innings loads.
+/// Shows a 3-second first innings summary screen, then draws the
+/// second innings layout row-by-row from top to bottom at 150ms per row.
+void _saveMatchTiedToHistory(Score firstInningsScore) {
+  if (currentMatch == null || currentInnings == null || currentScore == null) return;
+  
+  final firstInnings = Innings.getFirstInnings(widget.matchId);
+  if (firstInnings == null) return;
+  
+  final matchHistory = MatchHistory(
+    matchId: widget.matchId,
+    teamAId: firstInnings.battingTeamId,
+    teamBId: firstInnings.bowlingTeamId,
+    matchDate: DateTime.now(),
+    matchType: 'CRICKET',
+    team1Runs: firstInningsScore.totalRuns,
+    team1Wickets: firstInningsScore.wickets,
+    team1Overs: firstInningsScore.overs,
+    team2Runs: currentScore!.totalRuns,
+    team2Wickets: currentScore!.wickets,
+    team2Overs: currentScore!.overs,
+    result: 'Match Tied',
+    isCompleted: true,
+  );
+  
+  matchHistory.save();
+}
+
+Future<void> _sendSecondInningsIntroLayout() async {
+  try {
+    final bleService = BleManagerService();
+
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping second innings intro.');
+      return;
+    }
+
+    if (strikeBatsman == null || nonStrikeBatsman == null ||
+        currentBowler == null || currentScore == null ||
+        currentInnings == null) {
+      debugPrint('⚠️ Null data — skipping second innings intro.');
+      return;
+    }
+
+    // Helper function to center text
+    int centerX(String text, int scale) {
+      const int displayWidth = 128;
+      final int textWidth = text.length * 6 * scale;
+      return ((displayWidth - textWidth) / 2).round().clamp(0, displayWidth - 1);
+    }
+
+    // ── PHASE 1: SHOW FIRST INNINGS SUMMARY (3 seconds) ──────────────────
+    final firstInnings    = Innings.getFirstInnings(widget.matchId);
+    final firstScore      = firstInnings != null
+        ? Score.getByInningsId(firstInnings.inningsId)
+        : null;
+    final firstBattingTeam = firstInnings != null
+        ? Team.getById(firstInnings.battingTeamId)
+        : null;
+
+    final targetRuns      = currentInnings!.targetRuns.toString();
+    final inns1Runs       = firstScore?.totalRuns.toString()   ?? '0';
+    final inns1Wickets    = firstScore?.wickets.toString()      ?? '0';
+    final inns1Overs      = firstScore?.overs.toStringAsFixed(1) ?? '0.0';
+
+    String trunc(String? name, int max) {
+      final n = name ?? '';
+      return (n.length > max ? n.substring(0, max) : n).toUpperCase();
+    }
+
+    final firstTeamName = trunc(firstBattingTeam?.teamName, 8);
+
+    debugPrint('📺 Showing 1st innings summary...');
+
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    // Row 1: Header label - CENTERED
+    final headerText = 'INNINGS 1 SUMMARY';
+    final headerX = centerX(headerText, 1);
+    await bleService.sendRawCommands([
+      'TEXT $headerX 2 1 255 200 0 $headerText',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // Row 2: Divider
+    await bleService.sendRawCommands([
+      'LINE H 0 12 127 12 1 255 200 0',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // Row 3: Team name who batted - CENTERED AS GROUP
+    const String battingLabel = 'BATTING:';
+    final int battingW = battingLabel.length * 6; // scale 1 = 6px per char
+    final int teamW = firstTeamName.length * 6;
+    const int gap = 6; // space between label and name
+    final int totalW = battingW + gap + teamW;
+    final int groupX = ((128 - totalW) / 2).round().clamp(0, 127);
+    final int teamX = groupX + battingW + gap;
+
+    await bleService.sendRawCommands([
+      'TEXT $groupX 20 1 0 255 255 $battingLabel',
+      'TEXT $teamX 20 1 255 255 255 $firstTeamName',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // Row 4: Score - FIXED Y ALIGNMENT
+    await bleService.sendRawCommands([
+      'TEXT 5 32 2 255 0 255 SCORE:',
+      'TEXT 55 32 2 255 255 255 $inns1Runs',
+      'TEXT 80 32 3 255 100 100 /',  // ✅ FIXED: Changed y from 28 to 32
+      'TEXT 95 32 2 255 255 255 $inns1Wickets',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // Row 5: Overs - BETTER SPACING
+    await bleService.sendRawCommands([
+      'TEXT 10 52 1 0 255 255 OVERS:',
+      'TEXT 55 52 1 255 255 255 $inns1Overs',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // Row 6: Target - CENTERED AS GROUP
+    const String targetLabel = 'TARGET:';
+    final int targetLabelW = targetLabel.length * 6; // scale 1
+    final int targetNumW = targetRuns.length * 12; // scale 2
+    const int targetGap = 8;
+    final int targetTotalW = targetLabelW + targetGap + targetNumW;
+    final int targetGroupX = ((128 - targetTotalW) / 2).round().clamp(0, 127);
+    final int targetNumX = targetGroupX + targetLabelW + targetGap;
+
+    await bleService.sendRawCommands([
+      'LINE H 0 62 127 62 1 255 200 0',
+      'TEXT $targetGroupX 68 1 255 200 0 $targetLabel',
+      'TEXT $targetNumX 68 2 255 255 0 $targetRuns',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // Row 7: "INNINGS 2 STARTING" - CENTERED
+    const String startingText = 'INNINGS 2 STARTING...';
+    final int startingX = centerX(startingText, 1);
+    await bleService.sendRawCommands([
+      'TEXT $startingX 84 1 0 255 0 $startingText',
+    ]);
+
+    debugPrint('✅ 1st innings summary shown. Waiting 3s...');
+
+    // Hold summary for 3 seconds
+    await Future.delayed(const Duration(seconds: 3));
+
+    // ── PHASE 2: CLEAR + DRAW SECOND INNINGS LAYOUT ROW BY ROW ──────────
+    debugPrint('🖥️ Drawing 2nd innings layout row by row...');
+
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    // Prepare second innings data
+    final battingTeam      = Team.getById(currentInnings!.battingTeamId);
+    final bowlingTeam      = Team.getById(currentInnings!.bowlingTeamId);
+    final strikerPlayer    = TeamMember.getByPlayerId(strikeBatsman!.playerId);
+    final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
+    final bowlerPlayer     = TeamMember.getByPlayerId(currentBowler!.playerId);
+
+    final now     = DateTime.now();
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    final temp    = (_envService.currentTemperature ?? 27).round();
+
+    final battingName    = trunc(battingTeam?.teamName,        6);
+    final bowlingName    = trunc(bowlingTeam?.teamName,        6);
+    final strikerName    = trunc(strikerPlayer?.teamName,      7);
+    final nonStrikerName = trunc(nonStrikerPlayer?.teamName,   7);
+    final bowlerName     = trunc(bowlerPlayer?.teamName,       7);
+
+    final runs         = currentScore!.totalRuns.toString();      // "0"
+    final wickets      = currentScore!.wickets.toString();        // "0"
+    final overs        = currentScore!.overs.toStringAsFixed(1);  // "0.0"
+    final crr          = currentScore!.crr.toStringAsFixed(2);    // "0.00"
+    final strikerRuns  = strikeBatsman!.runs.toString();
+    final strikerBalls = strikeBatsman!.ballsFaced.toString();
+    final nsBatsRuns   = nonStrikeBatsman!.runs.toString();
+    final nsBatsBalls  = nonStrikeBatsman!.ballsFaced.toString();
+    final bowlerWkts   = currentBowler!.wickets.toString();
+    final bowlerRuns   = currentBowler!.runsConceded.toString();
+    final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
+
+    // ROW 1 (y=2): Header
+    await bleService.sendRawCommands([
+      'TEXT 3 2 1 255 255 200 $timeStr',
+      'TEXT 36 2 1 200 200 255 AEROBIOSYS',
+      'TEXT 102 2 1 200 255 200 ${temp}C',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ROW 2 (y=12+17): Divider + centered team names
+    const int charW2  = 6;
+    const int displayW2 = 128;
+    const int vsGap2  = 4;
+
+    final int batW2   = battingName.length  * charW2;
+    final int bowlW2  = bowlingName.length  * charW2;
+    const int vsW2    = 2 * charW2;
+    final int totalW2 = batW2 + vsGap2 + vsW2 + vsGap2 + bowlW2;
+    final int groupX2 = ((displayW2 - totalW2) / 2).round().clamp(0, displayW2 - 1);
+
+    final int batX2   = groupX2;
+    final int vsX2    = groupX2 + batW2 + vsGap2;
+    final int bowlX2  = vsX2 + vsW2 + vsGap2;
+
+    await bleService.sendRawCommands([
+      'LINE H 0 12 127 12 1 255 255 255',
+      'TEXT $batX2 17 1 0 255 255 $battingName',
+      'TEXT $vsX2 17 1 255 255 255 VS',
+      'TEXT $bowlX2 17 1 255 100 100 $bowlingName',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ROW 3 (y=30): Score
+    await bleService.sendRawCommands([
+      'TEXT 5 30 2 255 0 255 SCR:',
+      'TEXT 50 30 2 255 255 255 $runs',
+      'TEXT 88 26 3 255 100 100 /',
+      'TEXT 105 30 2 255 255 255 $wickets',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ROW 4 (y=50): TGT + Overs
+    await bleService.sendRawCommands([
+      'TEXT 5 50 1 255 255 0 TGT:',
+      'TEXT 29 50 1 255 255 0 $targetRuns',
+      'TEXT 60 50 1 0 255 0 OVR:',
+      'TEXT 84 50 1 0 255 0 $overs',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ROW 5 (y=60): Bowler
+    await bleService.sendRawCommands([
+      'TEXT 10 60 1 255 200 200 $bowlerName',
+      'TEXT 58 60 1 0 255 0 $bowlerWkts',
+      'TEXT 64 60 1 0 255 0 /',
+      'TEXT 70 60 1 0 255 0 $bowlerRuns',
+      'TEXT 82 60 1 0 255 0 ($bowlerOvers)',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    // ROW 6 (y=70+74+84): Divider + batsmen
+    await bleService.sendRawCommands([
+      'LINE H 0 70 127 70 1 255 255 255',
+      'TEXT 2 74 1 255 0 0 *',
+      'TEXT 8 74 1 200 255 255 $strikerName',
+      'TEXT 58 74 1 200 255 200 $strikerRuns($strikerBalls)',
+      'TEXT 8 84 1 200 200 255 $nonStrikerName',
+      'TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
+    ]);
+
+    debugPrint('✅ Second innings LED layout drawn row by row');
+
+  } catch (e) {
+    debugPrint('❌ _sendSecondInningsIntroLayout failed: $e');
+  }
+}
 
  void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
   currentInnings?.markCompleted();
@@ -242,12 +670,7 @@ Future<void> _clearLEDDisplay() async {
     
     debugPrint('🧹 Clearing LED display...');
     
-    // Fill entire display with black (clear screen)
-    final commands = [
-      'FILL 0 0 127 127 0 0 0',  // Clear entire 128x128 display
-    ];
-    
-    await bleService.sendRawCommands(commands);
+    await bleService.sendRawCommands(['CLEAR']);
     
     debugPrint('✅ LED display cleared');
     
@@ -255,6 +678,7 @@ Future<void> _clearLEDDisplay() async {
     debugPrint('❌ LED clear failed: $e');
   }
 }
+
 void _saveMatchState() {
   try {
     if (currentMatch == null || currentInnings == null || currentScore == null) {
@@ -398,6 +822,19 @@ void _saveMatchToHistory(bool battingTeamWon, Score firstInningsScore) {
   matchHistory.save();
 }
 void _showMatchTiedDialog(Score firstInningsScore) {
+  currentInnings?.markCompleted();
+
+  // Mark match as complete - freeze all buttons
+  setState(() {
+    isMatchComplete = true;
+  });
+
+  // 🔥 CLEAR LED DISPLAY IMMEDIATELY FOR TIE
+  _clearLEDDisplay();
+
+  // Save to match history
+  _saveMatchTiedToHistory(firstInningsScore);
+
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -485,28 +922,35 @@ void _showMatchTiedDialog(Score firstInningsScore) {
         ],
       ),
       actions: [
-       // In _showMatchTiedDialog method, replace the TextButton's onPressed:
-TextButton(
-  onPressed: () {
-    Navigator.of(context).pop(); // Close dialog
-    // Navigate to Home and reset to home tab
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (context) => const Home(),
-      ),
-      (route) => false,
-    );
-  },
-  child: const Text(
-    'View History',
-    style: TextStyle(color: Color(0xFF6D7CFF)),
-  ),
-),
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop(); // Close dialog
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (context) => const Home(),
+              ),
+              (route) => false,
+            );
+          },
+          child: const Text(
+            'View History',
+            style: TextStyle(color: Color(0xFF6D7CFF)),
+          ),
+        ),
       ],
     ),
   );
-}
 
+  // Auto-redirect to history page after 5 seconds
+  Future.delayed(const Duration(seconds: 5), () {
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const Home()),
+        (route) => false,
+      );
+    }
+  });
+}
 
 void _showLeaveMatchDialog() {
   // Dismiss blur overlay when back button is pressed
@@ -1417,7 +1861,11 @@ void _endInnings() {
       final firstInningsScore = Score.getByInningsId(firstInnings.inningsId);
       if (firstInningsScore != null && currentInnings!.hasValidTarget) {
         try {
-          if (currentInnings!.hasMetTarget(currentScore!.totalRuns)) {
+          // CHECK FOR TIE FIRST
+          if (currentScore!.totalRuns == firstInningsScore.totalRuns) {
+            _showMatchTiedDialog(firstInningsScore);
+            return;
+          } else if (currentInnings!.hasMetTarget(currentScore!.totalRuns)) {
             _showVictoryDialog(true, firstInningsScore);
             return;
           } else {
@@ -1433,7 +1881,6 @@ void _endInnings() {
     // First innings complete
     final teamMembers = TeamMember.getByTeamId(currentInnings!.battingTeamId);
     final totalTeamMembers = teamMembers.length;
-    // All out when wickets = total members - 1 (e.g., 10 wickets for 11 players)
     bool wasAllOut = currentScore!.wickets >= totalTeamMembers - 1;
     
     String message = wasAllOut 
@@ -2079,115 +2526,75 @@ void swapPlayers() {
 Future<void> _updateLEDAfterScore() async {
   try {
     final bleService = BleManagerService();
-    
+
     if (!bleService.isConnected) {
       debugPrint('⚠️ Bluetooth not connected. Skipping LED update.');
       return;
     }
-    
-    debugPrint('📤 Updating LED display (atomic commands)...');
-    
-    // Get player names
-    final strikerPlayer = TeamMember.getByPlayerId(strikeBatsman!.playerId);
-    final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
-    
-    String truncateName(String name) {
-      final truncated = name.length > 6 ? name.substring(0, 6) : name;
-      return truncated.toUpperCase();
+
+    if (strikeBatsman == null || nonStrikeBatsman == null ||
+        currentBowler == null || currentScore == null) {
+      debugPrint('⚠️ Null data — skipping LED update.');
+      return;
     }
-    
-    final strikerName = truncateName(strikerPlayer?.teamName ?? 'BAT1');
-    final nonStrikerName = truncateName(nonStrikerPlayer?.teamName ?? 'BAT2');
-    
-    // ✅ FIXED: Use atomic CHANGE commands (clear + write in one operation)
-    
-    // Define fixed positions and widths
-    const int scoreRunsX = 50;
-    const int scoreRunsY = 30;
-    const int scoreRunsWidth = 35;
-    const int scoreRunsHeight = 18;
-    
-    const int scoreWicketsX = 104;
-    const int scoreWicketsY = 30;
-    const int scoreWicketsWidth = 33;
-    const int scoreWicketsHeight = 18;
-    
-    const int crrX = 29;
-    const int crrY = 50;
-    const int crrWidth = 26;
-    const int crrHeight = 10;
-    
-    const int oversX = 84;
-    const int oversY = 50;
-    const int oversWidth = 16;
-    const int oversHeight = 10;
-    
-    const int bowlerStatsX = 58;
-    const int bowlerStatsY = 60;
-    const int bowlerStatsWidth = 24;
-    const int bowlerStatsHeight = 10;
-    
-    const int bowlerOversX = 84;
-    const int bowlerOversY = 60;
-    const int bowlerOversWidth = 20;
-    const int bowlerOversHeight = 10;
-    
-    const int strikerNameX = 10;
-    const int strikerNameY = 76;
-    const int strikerNameWidth = 32;
-    const int strikerNameHeight = 10;
-    
-    const int strikerStatsX = 46;
-    const int strikerStatsY = 76;
-    const int strikerStatsWidth = 82;
-    const int strikerStatsHeight = 10;
-    
-    const int nonStrikerNameX = 10;
-    const int nonStrikerNameY = 85;
-    const int nonStrikerNameWidth = 32;
-    const int nonStrikerNameHeight = 10;
-    
-    const int nonStrikerStatsX = 46;
-    const int nonStrikerStatsY = 85;
-    const int nonStrikerStatsWidth = 82;
-    const int nonStrikerStatsHeight = 10;
-    
-    // Prepare data strings
-    final runs = currentScore!.totalRuns.toString();
-    final wickets = currentScore!.wickets.toString();
-    final overs = currentScore!.overs.toStringAsFixed(1);
-    final crr = currentScore!.crr.toStringAsFixed(2);
-    
-    final strikerRuns = strikeBatsman!.runs.toString();
+
+    debugPrint('📤 Updating LED score (CHANGE only, static layout preserved)...');
+
+    final strikerPlayer    = TeamMember.getByPlayerId(strikeBatsman!.playerId);
+    final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
+    final bowlerPlayer     = TeamMember.getByPlayerId(currentBowler!.playerId);
+
+    String trunc(String? name, int max) {
+      final n = name ?? '';
+      return (n.length > max ? n.substring(0, max) : n).toUpperCase();
+    }
+
+    final strikerName    = trunc(strikerPlayer?.teamName,    7);
+    final nonStrikerName = trunc(nonStrikerPlayer?.teamName, 7);
+    final bowlerName     = trunc(bowlerPlayer?.teamName,     7);
+
+    final runs         = currentScore!.totalRuns.toString();
+    final wickets      = currentScore!.wickets.toString();
+    final overs        = currentScore!.overs.toStringAsFixed(1);
+    final crr          = currentScore!.crr.toStringAsFixed(2);
+    final strikerRuns  = strikeBatsman!.runs.toString();
     final strikerBalls = strikeBatsman!.ballsFaced.toString();
-    final nonStrikerRuns = nonStrikeBatsman!.runs.toString();
-    final nonStrikerBalls = nonStrikeBatsman!.ballsFaced.toString();
-    
-    final bowlerWickets = currentBowler!.wickets.toString();
-    final bowlerRuns = currentBowler!.runsConceded.toString();
-    final bowlerOvers = currentBowler!.overs.toStringAsFixed(1);
-    
-    // ✅ ATOMIC CHANGE COMMANDS (clear + write in one operation)
+    final nsBatsRuns   = nonStrikeBatsman!.runs.toString();
+    final nsBatsBalls  = nonStrikeBatsman!.ballsFaced.toString();
+    final bowlerWkts   = currentBowler!.wickets.toString();
+    final bowlerRuns   = currentBowler!.runsConceded.toString();
+    final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
+
+    // CHANGE only updates dynamic regions.
+    // Static elements (LINE H dividers, SCR:/CRR:/OVR: labels,
+    // VS text, / separator, * striker dot) are drawn once in
+    // _sendFullLEDLayout and never touched here — they stay intact.
     final commands = [
-      'FILL 0 0 127 127 0 0 0',  // Clear entire display before sending new data
-      'CHANGE $scoreRunsX $scoreRunsY $scoreRunsWidth $scoreRunsHeight 2 255 255 255 $runs',
-      'CHANGE $scoreWicketsX $scoreWicketsY $scoreWicketsWidth $scoreWicketsHeight 2 255 255 255 $wickets',
-      'CHANGE $crrX $crrY $crrWidth $crrHeight 1 255 255 0 $crr',
-      'CHANGE $oversX $oversY $oversWidth $oversHeight 1 0 255 0 $overs',
-      'CHANGE $bowlerStatsX $bowlerStatsY $bowlerStatsWidth $bowlerStatsHeight 1 0 255 0 $bowlerWickets/$bowlerRuns',
-      'CHANGE $bowlerOversX $bowlerOversY $bowlerOversWidth $bowlerOversHeight 1 0 255 0 ($bowlerOvers)',
-      'CHANGE $strikerNameX $strikerNameY $strikerNameWidth $strikerNameHeight 1 255 255 255 $strikerName',
-      'CHANGE $strikerStatsX $strikerStatsY $strikerStatsWidth $strikerStatsHeight 1 200 255 200 $strikerRuns($strikerBalls)',
-      'CHANGE $nonStrikerNameX $nonStrikerNameY $nonStrikerNameWidth $nonStrikerNameHeight 1 200 200 255 $nonStrikerName',
-      'CHANGE $nonStrikerStatsX $nonStrikerStatsY $nonStrikerStatsWidth $nonStrikerStatsHeight 1 200 255 200 $nonStrikerRuns($nonStrikerBalls)',
+      // Score: runs and wickets (coords match TEXT positions in _sendFullLEDLayout)
+      'CHANGE 50  30 36 14 2 255 255 255 $runs',
+      'CHANGE 105 30 22 14 2 255 255 255 $wickets',
+      // CRR and overs (same y=50, same x as TEXT)
+      'CHANGE 29  50 29 10 1 255 255 0   $crr',
+      'CHANGE 84  50 20 10 1 0   255 0   $overs',
+      // Bowler: name + stats
+      'CHANGE 10  60 46 10 1 255 200 200 $bowlerName',
+      'CHANGE 58  60 22 10 1 0   255 0   $bowlerWkts',
+      'CHANGE 64  60 6  10 1 0   255 0   /',
+      'CHANGE 70  60 28 10 1 0   255 0   $bowlerRuns',
+      'CHANGE 82  60 45 10 1 0   255 0   ($bowlerOvers)',
+      // Batsmen rows (same y=74/84 as TEXT in _sendFullLEDLayout)
+      'CHANGE 8   74 48 10 1 200 255 255 $strikerName',
+      'CHANGE 58  74 69 10 1 200 255 200 $strikerRuns($strikerBalls)',
+      'CHANGE 8   84 48 10 1 200 200 255 $nonStrikerName',
+      'CHANGE 58  84 69 10 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
     ];
-    
+
     await bleService.sendRawCommands(commands);
-    
-    debugPrint('✅ LED display updated - Runs: $runs/$wickets, Overs: $overs, CRR: $crr');
-    
+
+    debugPrint('✅ LED updated — $runs/$wickets ($overs) CRR:$crr');
+
   } catch (e) {
-    debugPrint('❌ LED update failed: $e');
+    debugPrint('❌ _updateLEDAfterScore failed: $e');
   }
 }
 

@@ -405,6 +405,7 @@ Widget _buildBottomNavBar() {
           offset: const Offset(0, -2),
         ),
       ],
+      
     ),
     child: SafeArea(
       child: Padding(

@@ -229,13 +229,15 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                       onPressed: () => Navigator.pop(context),
                     ),
                     Expanded(
-                      child: Text(
-                        '${Team.getById(innings.battingTeamId)?.teamName ?? "Team 1"} v/s ${Team.getById(innings.bowlingTeamId)?.teamName ?? "Team 2"}',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
+                      child: Center(
+                        child: Text(
+                          '${Team.getById(innings.battingTeamId)?.teamName ?? "Team 1"} v/s ${Team.getById(innings.bowlingTeamId)?.teamName ?? "Team 2"}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -294,11 +296,13 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                     ],
                   ),
                 ),
+                
 
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
+
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Target message (if second innings)
@@ -463,7 +467,7 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '${score.totalRuns}-${score.wickets} (${score.overs.toStringAsFixed(1)})',
+                        '${score.totalRuns}-${score.wickets}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 24,
@@ -471,10 +475,19 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                         ),
                       ),
                       Text(
-                        'CRR: ${score.crr.toStringAsFixed(2)}',
+                        '${score.overs.toStringAsFixed(1)} Ov',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'CRR: ${score.crr.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: Color(0xFFFFD700),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -562,7 +575,7 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                   ),
                   const Divider(color: Colors.white24, height: 20),
 
-                  // Total row
+                  // Total row - Separated into columns to avoid overlay
                   Row(
                     children: [
                       const Expanded(
@@ -577,13 +590,49 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                         ),
                       ),
                       Expanded(
-                        flex: 5,
+                        flex: 1,
                         child: Text(
-                          '${score.totalRuns}-${score.wickets} (${score.overs.toStringAsFixed(1)}) CRR: ${score.crr.toStringAsFixed(2)}',
-                          textAlign: TextAlign.right,
+                          score.totalRuns.toString(),
+                          textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 13,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          score.wickets.toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          score.overs.toStringAsFixed(1),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 1,
+                        child: Text(
+                          score.crr.toStringAsFixed(2),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFFFFD700),
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -732,11 +781,11 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          _buildCompactTableCell(bowler.overs.toStringAsFixed(1), 1, true),
-          _buildCompactTableCell(bowler.maidens.toString(), 1, true),
+          _buildCompactTableCell(bowler.overs.toStringAsFixed(1), 1, false),
+          _buildCompactTableCell(bowler.maidens.toString(), 1, false),
           _buildCompactTableCell(bowler.runsConceded.toString(), 1, true),
           _buildCompactTableCell(bowler.wickets.toString(), 1, true),
-          _buildCompactTableCell(bowler.economy.toStringAsFixed(1), 1, true),
+          _buildCompactTableCell(bowler.economy.toStringAsFixed(1), 1, false),
         ],
       ),
     );

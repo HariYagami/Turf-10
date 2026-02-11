@@ -337,16 +337,15 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       ),
     );
   }
-
-  Future<void> _showMemberCountDialog() async {
-    final controller = TextEditingController(
-      text: memberCount?.toString() ?? '',
-    );
-    
-    final result = await showDialog<int>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
+Future<void> _showMemberCountDialog() async {
+  final controller = TextEditingController(
+    text: memberCount?.toString() ?? '',
+  );
+  
+  final result = await showDialog<int>(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
@@ -384,25 +383,25 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(2),
-                  ],
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontFamily: 'Poppins',
-                    fontSize: 18,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'e.g., 11',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF9E9E9E),
-                      fontFamily: 'Poppins',
-                    ),
+             TextField(
+  controller: controller,
+  autofocus: true,
+  keyboardType: TextInputType.number,
+  inputFormatters: [
+    FilteringTextInputFormatter.digitsOnly,
+    LengthLimitingTextInputFormatter(2),
+  ],
+  style: const TextStyle(
+    color: Colors.black,
+    fontFamily: 'Poppins',
+    fontSize: 18,
+  ),
+  decoration: InputDecoration(
+    hintText: '5-11 players',  // Changed from 'e.g., 11'
+    hintStyle: const TextStyle(
+      color: Color(0xFF9E9E9E),
+      fontFamily: 'Poppins',
+    ),
                     filled: true,
                     fillColor: const Color(0xFFD9D9D9),
                     border: OutlineInputBorder(
@@ -448,38 +447,52 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final count = int.tryParse(controller.text);
-                          if (count != null && count > 0) {
-                            Navigator.of(dialogContext).pop(count);
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please enter a valid number'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF00C4FF),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: const Text(
-                          'Next',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
+                  Expanded(
+  child: ElevatedButton(
+    onPressed: () {
+      final count = int.tryParse(controller.text);
+      if (count == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a valid number'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else if (count < 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Minimum 2 players required'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else if (count > 11) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Maximum 11 players allowed'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } else {
+        Navigator.of(dialogContext).pop(count);
+      }
+    },
+    style: ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFF00C4FF),
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+      ),
+    ),
+    child: const Text(
+      'Next',
+      style: TextStyle(
+        color: Colors.white,
+        fontFamily: 'Poppins',
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  ),
+),
                   ],
                 ),
               ],
@@ -489,130 +502,127 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
       },
     );
 
-    if (result != null && result > 0) {
-      widget.team.updateCount(result);
-      setState(() {
-        memberCount = result;
-        isEditingCount = false;
-      });
-      _initializePlayerFields(result);
-      _loadExistingPlayers();
-    }
+  if (result != null && result > 0) {
+    // ✅ REMOVED: widget.team.updateCount(result);
+    // Don't update team count here - only update after players are saved
+    setState(() {
+      memberCount = result;
+      isEditingCount = false;
+    });
+    _initializePlayerFields(result);
+    _loadExistingPlayers();
   }
-
+}
   // ✅ UPDATED: Added unique name validation
   void _savePlayers() {
-    if (memberCount == null || memberCount! <= 0) {
-      _showSnackBar('Please set member count first', Colors.orange);
+  if (memberCount == null || memberCount! <= 0) {
+    _showSnackBar('Please set member count first', Colors.orange);
+    return;
+  }
+
+  List<String> playerNames = [];
+  
+  // First pass: collect all names and check for empty fields
+  for (var controller in playerControllers) {
+    final name = controller.text.trim();
+    if (name.isEmpty) {
+      _showSnackBar('Please fill all player names', Colors.orange);
       return;
     }
+    playerNames.add(name);
+  }
 
-    List<String> playerNames = [];
+  // Check for duplicate names within the form (case-insensitive)
+  Set<String> uniqueNames = {};
+  for (var name in playerNames) {
+    final lowerName = name.toLowerCase();
+    if (uniqueNames.contains(lowerName)) {
+      _showSnackBar('Duplicate player name found: "$name"', Colors.orange);
+      return;
+    }
+    uniqueNames.add(lowerName);
+  }
+
+  try {
+    // Get existing players
+    final existingPlayers = PlayerStorage.getPlayersByTeam(widget.team.teamId);
+    final existingCount = existingPlayers.length;
     
-    // ✅ First pass: collect all names and check for empty fields
-    for (var controller in playerControllers) {
-      final name = controller.text.trim();
-      if (name.isEmpty) {
-        _showSnackBar('Please fill all player names', Colors.orange);
-        return;
-      }
-      playerNames.add(name);
-    }
-
-    // ✅ Check for duplicate names within the form (case-insensitive)
-    Set<String> uniqueNames = {};
-    for (var name in playerNames) {
-      final lowerName = name.toLowerCase();
-      if (uniqueNames.contains(lowerName)) {
-        _showSnackBar('Duplicate player name found: "$name"', Colors.orange);
-        return;
-      }
-      uniqueNames.add(lowerName);
-    }
-
-    try {
-      // Get existing players
-      final existingPlayers = PlayerStorage.getPlayersByTeam(widget.team.teamId);
-      final existingCount = existingPlayers.length;
+    if (memberCount! > existingCount) {
+      // Adding new members - check for duplicates with existing players
+      final newMembersToAdd = playerNames.sublist(existingCount);
       
-      if (memberCount! > existingCount) {
-        // Adding new members - check for duplicates with existing players
-        final newMembersToAdd = playerNames.sublist(existingCount);
+      for (var playerName in newMembersToAdd) {
+        bool isDuplicate = false;
+        for (var existingPlayer in existingPlayers) {
+          if (existingPlayer.teamName.toLowerCase() == playerName.toLowerCase()) {
+            isDuplicate = true;
+            break;
+          }
+        }
         
-        for (var playerName in newMembersToAdd) {
-          // ✅ Check if name already exists in the database for this team
+        if (isDuplicate) {
+          _showSnackBar('Player name "$playerName" already exists in this team', Colors.orange);
+          return;
+        }
+      }
+      
+      // All validations passed - add new players
+      for (var playerName in newMembersToAdd) {
+        PlayerStorage.addPlayer(widget.team.teamId, playerName);
+      }
+      
+      // ✅ UPDATE: Only update team count based on actual saved players
+      final actualPlayerCount = PlayerStorage.getTeamPlayerCount(widget.team.teamId);
+      widget.team.updateCount(actualPlayerCount);
+      
+      _showSnackBar(
+        '${newMembersToAdd.length} new player${newMembersToAdd.length > 1 ? 's' : ''} added to ${widget.team.teamName}',
+        Colors.green,
+      );
+    } else if (memberCount! < existingCount) {
+      _showSnackBar(
+        'Cannot reduce member count. Use "Clear All" to remove players if needed.',
+        Colors.orange,
+      );
+      return;
+    } else {
+      // Same count - update existing player names if changed
+      bool hasChanges = false;
+      
+      for (int i = 0; i < playerNames.length && i < existingPlayers.length; i++) {
+        if (existingPlayers[i].teamName != playerNames[i]) {
           bool isDuplicate = false;
-          for (var existingPlayer in existingPlayers) {
-            if (existingPlayer.teamName.toLowerCase() == playerName.toLowerCase()) {
+          for (int j = 0; j < existingPlayers.length; j++) {
+            if (i != j && existingPlayers[j].teamName.toLowerCase() == playerNames[i].toLowerCase()) {
               isDuplicate = true;
               break;
             }
           }
           
           if (isDuplicate) {
-            _showSnackBar('Player name "$playerName" already exists in this team', Colors.orange);
+            _showSnackBar('Player name "${playerNames[i]}" already exists in this team', Colors.orange);
             return;
           }
-        }
-        
-        // All validations passed - add new players
-        for (var playerName in newMembersToAdd) {
-          PlayerStorage.addPlayer(widget.team.teamId, playerName);
-        }
-        
-        // Update team count
-        widget.team.updateCount(memberCount!);
-        
-        _showSnackBar(
-          '${newMembersToAdd.length} new player${newMembersToAdd.length > 1 ? 's' : ''} added to ${widget.team.teamName}',
-          Colors.green,
-        );
-      } else if (memberCount! < existingCount) {
-        // Reducing members - safer to prevent accidental deletion
-        _showSnackBar(
-          'Cannot reduce member count. Use "Clear All" to remove players if needed.',
-          Colors.orange,
-        );
-        return;
-      } else {
-        // Same count - update existing player names if changed
-        bool hasChanges = false;
-        
-        for (int i = 0; i < playerNames.length && i < existingPlayers.length; i++) {
-          if (existingPlayers[i].teamName != playerNames[i]) {
-            // ✅ Check if the new name conflicts with other players (excluding current one)
-            bool isDuplicate = false;
-            for (int j = 0; j < existingPlayers.length; j++) {
-              if (i != j && existingPlayers[j].teamName.toLowerCase() == playerNames[i].toLowerCase()) {
-                isDuplicate = true;
-                break;
-              }
-            }
-            
-            if (isDuplicate) {
-              _showSnackBar('Player name "${playerNames[i]}" already exists in this team', Colors.orange);
-              return;
-            }
-            
-            existingPlayers[i].teamName = playerNames[i];
-            PlayerStorage.updatePlayer(existingPlayers[i]);
-            hasChanges = true;
-          }
-        }
-        
-        if (hasChanges) {
-          _showSnackBar('Player names updated', Colors.green);
-        } else {
-          _showSnackBar('No changes made', Colors.blue);
+          
+          existingPlayers[i].teamName = playerNames[i];
+          PlayerStorage.updatePlayer(existingPlayers[i]);
+          hasChanges = true;
         }
       }
       
-      Navigator.pop(context, true);
-    } catch (e) {
-      _showSnackBar('Error saving players: $e', Colors.red);
+      if (hasChanges) {
+        _showSnackBar('Player names updated', Colors.green);
+      } else {
+        _showSnackBar('No changes made', Colors.blue);
+      }
     }
+    
+    Navigator.pop(context, true);
+  } catch (e) {
+    _showSnackBar('Error saving players: $e', Colors.red);
   }
-
+}
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -810,12 +820,12 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
                 color: Colors.white,
                 fontFamily: 'Poppins',
               ),
-              decoration: InputDecoration(
-                hintText: 'Player ${index + 1} name',
-                hintStyle: const TextStyle(
-                  color: Color(0xFF9E9E9E),
-                  fontFamily: 'Poppins',
-                ),
+           decoration: InputDecoration(
+  hintText: '2-11 players',  // Changed to reflect minimum 2 players
+  hintStyle: const TextStyle(
+    color: Color(0xFF9E9E9E),
+    fontFamily: 'Poppins',
+  ),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,

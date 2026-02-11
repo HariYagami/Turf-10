@@ -2,14 +2,15 @@ import 'package:TURF_TOWN_/src/Pages/Teams/cricket_scorer_screen.dart';
 import 'package:TURF_TOWN_/src/models/batsman.dart';
 import 'package:TURF_TOWN_/src/models/bowler.dart';
 import 'package:TURF_TOWN_/src/models/innings.dart';
+import 'package:TURF_TOWN_/src/models/score.dart';
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/CommonParameters/AppBackGround1/Appbg1.dart';
 import 'package:TURF_TOWN_/src/models/match_storage.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
+
 import 'package:TURF_TOWN_/src/models/team_member.dart';
 import 'package:TURF_TOWN_/src/models/player_storage.dart';
-
-
+import 'package:TURF_TOWN_/src/services/bluetooth_service.dart';
 
 class SelectPlayersPage extends StatefulWidget {
   final String battingTeamName;
@@ -220,89 +221,119 @@ class _SelectPlayersPageState extends State<SelectPlayersPage> {
   }
 
   void _proceedToMatch() {
-  // Validate all selections
-  if (selectedStriker == null || selectedNonStriker == null || selectedBowler == null) {
-    _showSnackBar('Please select all players!', Colors.red);
-    return;
-  }
-  
-  if (selectedStriker == selectedNonStriker) {
-    _showSnackBar('Striker and Non-Striker cannot be the same!', Colors.red);
-    return;
-  }
-  
-  if (currentMatchId == null || battingTeamId == null || bowlingTeamId == null) {
-    _showSnackBar('Match data not found!', Colors.red);
-    return;
-  }
-  
-  // Get player names for confirmation
-  final striker = TeamMember.getByPlayerId(selectedStriker!);
-  final nonStriker = TeamMember.getByPlayerId(selectedNonStriker!);
-  final bowler = TeamMember.getByPlayerId(selectedBowler!);
-  
-  // Show confirmation dialog
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF1C2026),
-      title: const Text(
-        'Confirm Players',
-        style: TextStyle(color: Colors.white, fontSize: 18),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Match ID: $currentMatchId',
-            style: const TextStyle(color: Color(0xFF00C4FF), fontWeight: FontWeight.bold),
+    // Validate all selections
+    if (selectedStriker == null || selectedNonStriker == null || selectedBowler == null) {
+      _showSnackBar('Please select all players!', Colors.red);
+      return;
+    }
+    
+    if (selectedStriker == selectedNonStriker) {
+      _showSnackBar('Striker and Non-Striker cannot be the same!', Colors.red);
+      return;
+    }
+    
+    if (currentMatchId == null || battingTeamId == null || bowlingTeamId == null) {
+      _showSnackBar('Match data not found!', Colors.red);
+      return;
+    }
+    
+    // Get player names for confirmation
+    final striker = TeamMember.getByPlayerId(selectedStriker!);
+    final nonStriker = TeamMember.getByPlayerId(selectedNonStriker!);
+    final bowler = TeamMember.getByPlayerId(selectedBowler!);
+    
+    // Show confirmation dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1C2026),
+        title: const Text(
+          'Confirm Players',
+          style: TextStyle(color: Colors.white, fontSize: 18),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Match ID: $currentMatchId',
+              style: const TextStyle(color: Color(0xFF00C4FF), fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Striker: ${striker?.teamName ?? "Unknown"}',
+              style: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Non-Striker: ${nonStriker?.teamName ?? "Unknown"}',
+              style: const TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Bowler: ${bowler?.teamName ?? "Unknown"}',
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
           ),
-          const SizedBox(height: 12),
-          Text(
-            'Striker: ${striker?.teamName ?? "Unknown"}',
-            style: const TextStyle(color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Non-Striker: ${nonStriker?.teamName ?? "Unknown"}',
-            style: const TextStyle(color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Bowler: ${bowler?.teamName ?? "Unknown"}',
-            style: const TextStyle(color: Colors.white),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00C4FF),
+            ),
+            onPressed: () {
+              Navigator.pop(context); // Close the dialog
+              _startMatch();
+            },
+            child: const Text('Start', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00C4FF),
-          ),
-          onPressed: () {
-            Navigator.pop(context); // Close the dialog
-            _startMatch();
-          },
-          child: const Text('Start', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
-  );
-}
+    );
+  }
 
-void _startMatch() async {
+ void _startMatch() async {
   try {
-    // Create FIRST innings for the match using the specific factory method
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => WillPopScope(
+        onWillPop: () async => false,
+        child: const Dialog(
+          backgroundColor: Colors.transparent,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Color(0xFF00C4FF)),
+                SizedBox(height: 16),
+                Text(
+                  'Starting match...',
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    
+    debugPrint('╔════════════════════════════════════════╗');
+    debugPrint('║        INITIALIZING MATCH              ║');
+    debugPrint('╚════════════════════════════════════════╝');
+    
+    // Create FIRST innings for the match
     final innings = Innings.createFirstInnings(
       matchId: currentMatchId!,
       battingTeamId: battingTeamId!,
       bowlingTeamId: bowlingTeamId!,
     );
+    debugPrint('✅ Innings created: ${innings.inningsId}');
     
     // Create batsmen records
     final strikerBatsman = Batsman.create(
@@ -310,12 +341,14 @@ void _startMatch() async {
       teamId: battingTeamId!,
       playerId: selectedStriker!,
     );
+    debugPrint('✅ Striker batsman created');
     
     final nonStrikerBatsman = Batsman.create(
       inningsId: innings.inningsId,
       teamId: battingTeamId!,
       playerId: selectedNonStriker!,
     );
+    debugPrint('✅ Non-striker batsman created');
     
     // Create bowler record
     final bowler = Bowler.create(
@@ -323,11 +356,42 @@ void _startMatch() async {
       teamId: bowlingTeamId!,
       playerId: selectedBowler!,
     );
+    debugPrint('✅ Bowler created');
     
-    _showSnackBar('Starting match...', Colors.green);
+    // Create initial score
+    final score = Score.create(innings.inningsId);
+    score.strikeBatsmanId = strikerBatsman.batId;
+    score.nonStrikeBatsmanId = nonStrikerBatsman.batId;
+    score.currentBowlerId = bowler.bowlerId;
+    score.save();
+    debugPrint('✅ Score initialized');
+    
+    // Send LED display data via Bluetooth
+    debugPrint('📤 Attempting to send data to LED display...');
+    await _sendInitialLEDData(
+      innings: innings,
+      striker: strikerBatsman,
+      nonStriker: nonStrikerBatsman,
+      bowler: bowler,
+      score: score,
+    );
+    
+    // Small delay to ensure LED update completes
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Close loading dialog
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context).pop();
+    }
+    
+    debugPrint('╔════════════════════════════════════════╗');
+    debugPrint('║    ✅ MATCH STARTED SUCCESSFULLY       ║');
+    debugPrint('╚════════════════════════════════════════╝');
+    
+    _showSnackBar('🏏 Match started successfully!', Colors.green);
     
     // Navigate to CricketScorerScreen
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => CricketScorerScreen(
@@ -340,8 +404,150 @@ void _startMatch() async {
       ),
     );
   } catch (e) {
-    _showSnackBar('Error starting match: $e', Colors.red);
-    print('Error in _startMatch: $e');
+    debugPrint('╔════════════════════════════════════════╗');
+    debugPrint('║  ❌ ERROR STARTING MATCH               ║');
+    debugPrint('║  $e');
+    debugPrint('╚════════════════════════════════════════╝');
+    
+    // Close loading dialog if still open
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.of(context).pop();
+    }
+    
+    _showSnackBar('❌ Error starting match: $e', Colors.red);
+  }
+}
+
+  // Add this new method to send initial LED data
+ // Update the _sendInitialLEDData method in select_players_page.dart
+// Add this method after _sendInitialLEDData or in the LED communication section
+Future<void> _clearLEDScreen() async {
+  try {
+    final bleService = BleManagerService();
+    
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping LED clear.');
+      return;
+    }
+    
+    debugPrint('🧹 Clearing LED screen...');
+    
+    await bleService.sendRawCommands(['CLEAR']);
+    
+    debugPrint('✅ LED screen cleared');
+  } catch (e) {
+    debugPrint('❌ Failed to clear LED screen: $e');
+  }
+}
+
+Future<void> _sendInitialLEDData({
+  required Innings innings,
+  required Batsman striker,
+  required Batsman nonStriker,
+  required Bowler bowler,
+  required Score score,
+}) async {
+  try {
+    final bleService = BleManagerService();
+
+    if (!bleService.isConnected) {
+      debugPrint('⚠️ Bluetooth not connected. Skipping LED update.');
+      _showSnackBar('LED Display not connected', Colors.orange);
+      return;
+    }
+
+    debugPrint('╔════════════════════════════════════════╗');
+    debugPrint('║     SENDING MATCH DATA TO LED          ║');
+    debugPrint('╚════════════════════════════════════════╝');
+
+    // ── STEP 1: CLEAR ENTIRE SCREEN ──────────────────────────────────────────
+    debugPrint('📍 Step 1: Sending FILL clear command...');
+    await bleService.sendRawCommands(['FILL 0 0 127 127 0 0 0']);
+
+    // ── STEP 2: LONG PAUSE — let ESP32 finish rendering the FILL ─────────────
+    // 800ms was too short. ESP32 queues commands; if new commands arrive before
+    // FILL completes they render on top of the old static content.
+    debugPrint('📍 Step 2: Waiting 1500ms for FILL to complete on ESP32...');
+    await Future.delayed(const Duration(milliseconds: 1500));
+
+    // ── STEP 3: PREPARE DATA ─────────────────────────────────────────────────
+    debugPrint('📍 Step 3: Preparing player/team data...');
+
+    final battingTeam  = Team.getById(innings.battingTeamId);
+    final strikerPlayer    = TeamMember.getByPlayerId(striker.playerId);
+    final nonStrikerPlayer = TeamMember.getByPlayerId(nonStriker.playerId);
+    final bowlerPlayer     = TeamMember.getByPlayerId(bowler.playerId);
+
+    final now     = DateTime.now();
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    const int temp = 27;
+
+    // Truncate + uppercase to fit LED character grid
+    String trunc(String name) =>
+        (name.length > 6 ? name.substring(0, 6) : name).toUpperCase();
+
+    final teamName       = trunc(battingTeam?.teamName        ?? 'BAT');
+    final strikerName    = trunc(strikerPlayer?.teamName      ?? 'BAT1');
+    final nonStrikerName = trunc(nonStrikerPlayer?.teamName   ?? 'BAT2');
+    final bowlerName     = trunc(bowlerPlayer?.teamName       ?? 'BOWL');
+
+    debugPrint('   Team: $teamName | Striker: $strikerName | '
+               'Non-Striker: $nonStrikerName | Bowler: $bowlerName');
+    debugPrint('   Time: $timeStr | Temp: ${temp}°C');
+
+    // ── STEP 4: HEADER ROW (time + temperature) ──────────────────────────────
+    // CHANGE = atomic clear-region + write → zero overlay risk
+    debugPrint('📍 Step 4: Sending header (time & temp)...');
+    await bleService.sendRawCommands([
+      'CHANGE 3 2 33 10 1 255 255 200 $timeStr',
+      'CHANGE 102 2 22 10 1 200 255 200 ${temp}C',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // ── STEP 5: TEAM NAME ROW ────────────────────────────────────────────────
+    debugPrint('📍 Step 5: Sending team name...');
+    await bleService.sendRawCommands([
+      'CHANGE 15 17 40 10 1 0 255 255 $teamName',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // ── STEP 6: SCORE AREA (runs / wickets / overs / CRR) ────────────────────
+    debugPrint('📍 Step 6: Sending score placeholders...');
+    await bleService.sendRawCommands([
+      'CHANGE 50  30 35 18 2 255 255 255 0',     // Runs  (large font=2)
+      'CHANGE 104 30 33 18 2 255 255 255 0',     // Wickets
+      'CHANGE 29  50 26 10 1 255 255   0 0.00',  // CRR
+      'CHANGE 84  50 16 10 1   0 255   0 0.0',   // Overs
+    ]);
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // ── STEP 7: BOWLER ROW ───────────────────────────────────────────────────
+    debugPrint('📍 Step 7: Sending bowler info...');
+    await bleService.sendRawCommands([
+      'CHANGE 10 60 32 10 1 255 200 200 $bowlerName',
+      'CHANGE 58 60 24 10 1   0 255   0 0/0',
+      'CHANGE 84 60 20 10 1   0 255   0 (0.0)',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // ── STEP 8: BATSMEN ROWS ─────────────────────────────────────────────────
+    debugPrint('📍 Step 8: Sending batsmen info...');
+    await bleService.sendRawCommands([
+      'CHANGE 10 76 32 10 1 255 255 255 $strikerName',
+      'CHANGE 46 76 82 10 1 200 255 200 0(0)',
+      'CHANGE 10 85 32 10 1 200 200 255 $nonStrikerName',
+      'CHANGE 46 85 82 10 1 200 255 200 0(0)',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    debugPrint('╔════════════════════════════════════════╗');
+    debugPrint('║  ✅ LED DISPLAY INITIALISED OK         ║');
+    debugPrint('╚════════════════════════════════════════╝');
+    _showSnackBar('✅ LED Display initialised', Colors.green);
+
+  } catch (e) {
+    debugPrint('❌ _sendInitialLEDData failed: $e');
+    _showSnackBar('⚠️ Failed to initialise LED: $e', Colors.orange);
   }
 }
 
@@ -717,162 +923,159 @@ void _startMatch() async {
                                         fontSize: 14,
                                         color: Colors.white70,
                                         fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    Text(
-                                      "Players: ${battingPlayers.length} batters, ${bowlingPlayers.length} bowlers",
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white54,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 20),
-
-                                    // Striker
-                                    const Text(
-                                      "Striker",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 15),
-                                    _buildPlayerSelector(
-                                      "Select Striker",
-                                      selectedStriker,
-                                      'Striker',
-                                    ),
-
-                                    const SizedBox(height: 20),
-
-                                    // Non-Striker
-                                    const Text(
-                                      "Non-Striker",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 15),
-                                    _buildPlayerSelector(
-                                      "Select Non-Striker",
-                                      selectedNonStriker,
-                                      'Non-Striker',
-                                    ),
-
-                                    const SizedBox(height: 20),
-
-                                    // Bowler
-                                    const Text(
-                                      "Bowler",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 15),
-                                    _buildPlayerSelector(
-                                      "Choose Bowler",
-                                      selectedBowler,
-                                      'Bowler',
-                                    ),
-
-                                    const SizedBox(height: 57),
-
-                                    // Proceed Button
-                                    Center(
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(0xFF0E7292),
-                                          minimumSize: const Size(50, 50),
-                                          maximumSize: const Size(150, 50),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 20,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(30),
-                                          ),
-                                        ),
-                                        onPressed: _proceedToMatch,
-                                        child: Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                          children: [
-                                            Flexible(
-                                              fit: FlexFit.loose,
-                                              child: const Text(
-                                                "Proceed",
-                                                style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.white,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                            const SizedBox(width: 10),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    SizedBox(height: 50),
-                                  ],
+                                      ),),
+                                const SizedBox(height: 5),
+                                Text(
+                                  "Players: ${battingPlayers.length} batters, ${bowlingPlayers.length} bowlers",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white54,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 20),
+
+                                // Striker
+                                const Text(
+                                  "Striker",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 15),
+                                _buildPlayerSelector(
+                                  "Select Striker",
+                                  selectedStriker,
+                                  'Striker',
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                // Non-Striker
+                                const Text(
+                                  "Non-Striker",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 15),
+                                _buildPlayerSelector(
+                                  "Select Non-Striker",
+                                  selectedNonStriker,
+                                  'Non-Striker',
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                // Bowler
+                                const Text(
+                                  "Bowler",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 15),
+                                _buildPlayerSelector(
+                                  "Choose Bowler",
+                                  selectedBowler,
+                                  'Bowler',
+                                ),
+
+                                const SizedBox(height: 57),
+
+                                // Proceed Button
+                                Center(
+                                  child: ElevatedButton(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF0E7292),
+                                      minimumSize: const Size(50, 50),
+                                      maximumSize: const Size(150, 50),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                    ),
+                                    onPressed: _proceedToMatch,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Flexible(
+                                          fit: FlexFit.loose,
+                                          child: const Text(
+                                            "Proceed",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              color: Colors.white,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(height: 50),
+                              ],
+                            ),
                           ),
-                        ),
-
-                        const SizedBox(height: 20),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildPlayerSelector(String hint, String? selectedPlayerId, String playerType) {
-    final selectedPlayer = selectedPlayerId != null 
-        ? TeamMember.getByPlayerId(selectedPlayerId)
-        : null;
-    
-    return GestureDetector(
-      onTap: () => _showPlayerSelectionDialog(playerType),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-        height: 44.23,
-        decoration: BoxDecoration(
-          color: Color(0xFFD9D9D9),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                selectedPlayer != null ? selectedPlayer.teamName : hint,
-                style: TextStyle(
-                  color: selectedPlayer != null ? Colors.black : Color(0xFF9E9E9E),
-                  fontSize: 14,
-                  fontWeight: selectedPlayer != null ? FontWeight.w500 : FontWeight.w400,
+                    const SizedBox(height: 20),
+                  ],
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
             ),
-            const Icon(
-              Icons.arrow_drop_down,
-              color: Colors.white,
-              size: 20,
+    ),
+  ),
+);
+}
+Widget _buildPlayerSelector(String hint, String? selectedPlayerId, String playerType) {
+final selectedPlayer = selectedPlayerId != null
+? TeamMember.getByPlayerId(selectedPlayerId)
+: null;
+return GestureDetector(
+  onTap: () => _showPlayerSelectionDialog(playerType),
+  child: Container(
+    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+    height: 44.23,
+    decoration: BoxDecoration(
+      color: Color(0xFFD9D9D9),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            selectedPlayer != null ? selectedPlayer.teamName : hint,
+            style: TextStyle(
+              color: selectedPlayer != null ? Colors.black : Color(0xFF9E9E9E),
+              fontSize: 14,
+              fontWeight: selectedPlayer != null ? FontWeight.w500 : FontWeight.w400,
             ),
-          ],
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
-      ),
-    );
-  }
+        const Icon(
+          Icons.arrow_drop_down,
+          color: Colors.white,
+          size: 20,
+        ),
+      ],
+    ),
+  ),
+);
+}
 }

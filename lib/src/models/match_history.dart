@@ -13,7 +13,7 @@ class MatchHistory {
   String teamAId; // Foreign key to team A
   String teamBId; // Foreign key to team B
 
-  @Property(type: PropertyType.date) // FIXED: Explicitly define date type
+  @Property(type: PropertyType.date)
   DateTime matchDate;
   
   String matchType; // e.g., 'CRICKET'
@@ -28,6 +28,10 @@ class MatchHistory {
 
   String result; // e.g., 'Team A won by 5 wickets'
   bool isCompleted;
+
+  // NEW FIELDS FOR SAVE/RESUME FUNCTIONALITY
+  bool isPaused; // Track if match was paused/quit halfway
+  String? pausedState; // JSON string storing complete match state when paused
 
   MatchHistory({
     this.id = 0,
@@ -44,6 +48,8 @@ class MatchHistory {
     required this.team2Overs,
     required this.result,
     required this.isCompleted,
+    this.isPaused = false, // NEW: Default to false
+    this.pausedState, // NEW: Optional paused state
   });
 
   // Static methods for database operations
@@ -63,6 +69,8 @@ class MatchHistory {
     required double team2Overs,
     required String result,
     required bool isCompleted,
+    bool isPaused = false, // NEW: Optional parameter
+    String? pausedState, // NEW: Optional parameter
   }) {
     final matchHistory = MatchHistory(
       matchId: matchId,
@@ -78,6 +86,8 @@ class MatchHistory {
       team2Overs: team2Overs,
       result: result,
       isCompleted: isCompleted,
+      isPaused: isPaused, // NEW
+      pausedState: pausedState, // NEW
     );
 
     ObjectBoxHelper.matchHistoryBox.put(matchHistory);
@@ -99,10 +109,21 @@ class MatchHistory {
     return matchHistory;
   }
 
-  /// Get completed matches - ADDED: This method was missing
+  /// Get completed matches only (excludes paused matches)
   static List<MatchHistory> getAllCompleted() {
     final query = ObjectBoxHelper.matchHistoryBox
-        .query(MatchHistory_.isCompleted.equals(true))
+        .query(MatchHistory_.isCompleted.equals(true) & MatchHistory_.isPaused.equals(false))
+        .order(MatchHistory_.matchDate, flags: Order.descending)
+        .build();
+    final matches = query.find();
+    query.close();
+    return matches;
+  }
+
+  /// NEW: Get paused matches only
+  static List<MatchHistory> getPausedMatches() {
+    final query = ObjectBoxHelper.matchHistoryBox
+        .query(MatchHistory_.isPaused.equals(true))
         .order(MatchHistory_.matchDate, flags: Order.descending)
         .build();
     final matches = query.find();
@@ -135,5 +156,23 @@ class MatchHistory {
   /// Delete the current match history
   void delete() {
     ObjectBoxHelper.matchHistoryBox.remove(id);
+  }
+
+  /// NEW: Mark match as completed and remove paused state
+  void markAsCompleted(String finalResult) {
+    isCompleted = true;
+    isPaused = false;
+    pausedState = null;
+    result = finalResult;
+    save();
+  }
+
+  /// NEW: Mark match as paused with state
+  void markAsPaused(String stateJson) {
+    isPaused = true;
+    isCompleted = false;
+    pausedState = stateJson;
+    result = 'Match Paused';
+    save();
   }
 }

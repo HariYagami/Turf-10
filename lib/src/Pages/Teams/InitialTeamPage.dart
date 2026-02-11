@@ -1,6 +1,5 @@
 import 'package:TURF_TOWN_/src/Pages/Teams/TeamPage.dart';
-import 'package:TURF_TOWN_/src/Screens/advanced.settings_screen.dart';
-import 'package:TURF_TOWN_/src/Pages/Teams/TeamPage.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +7,7 @@ import 'package:TURF_TOWN_/src/Pages/Teams/playerselection_page.dart';
 import 'package:TURF_TOWN_/src/views/Home.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
 import 'package:TURF_TOWN_/src/models/match_storage.dart';
+import 'package:TURF_TOWN_/src/models/player_storage.dart';
 
 class SmoothPageRoute extends PageRouteBuilder {
   final Widget page;
@@ -118,6 +118,12 @@ class _TeamPageState extends State<TeamPage> {
     oversController.dispose();
     super.dispose();
   }
+  @override
+void didChangeDependencies() {
+  super.didChangeDependencies();
+  // Reload teams whenever the page comes into focus
+  _loadTeams();
+}
 
   void _startMatch() {
   // Validate all fields
@@ -125,13 +131,6 @@ class _TeamPageState extends State<TeamPage> {
     _showSnackBar('Please select both teams', Colors.red);
     return;
   }
-
-  @override
-void didChangeDependencies() {
-  super.didChangeDependencies();
-  // Reload teams whenever the page comes into focus
-  _loadTeams();
-}
 
   if (team1Id == team2Id) {
     _showSnackBar('Teams cannot be the same', Colors.red);
@@ -569,108 +568,416 @@ Widget _buildDrawer() {
 }
 
 void _showTeamSelectionDialog(String label, String? currentTeamId, Function(String?) onChanged) {
-  // Reload teams immediately when dialog opens
-  final freshTeams = Team.getAll();
-  
-  // Determine which team ID to exclude based on the label
-  String? otherTeamId;
-  int? requiredPlayerCount;
-  
-  if (label == 'Team 1') {
-    otherTeamId = team2Id;
-  } else if (label == 'Team 2') {
-    otherTeamId = team1Id;
-    // If Team 1 is selected, get its player count
-    if (team1Id != null) {
-      final team1 = Team.getById(team1Id!);
-      requiredPlayerCount = team1?.teamCount;
-    }
-  }
-
   showDialog(
     context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF1C2026),
-      title: Text('Select $label', style: const TextStyle(color: Colors.white)),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: freshTeams.isEmpty  // Use freshTeams instead of allTeams
-            ? const Padding(
-                padding: EdgeInsets.all(20.0),
-                child: Text(
-                  'No teams available.\nPlease create teams first.',
-                  style: TextStyle(color: Colors.white70),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                itemCount: freshTeams.length,  // Use freshTeams
-                itemBuilder: (context, index) {
-                  final team = freshTeams[index];  // Use freshTeams
-                  final isSelected = team.teamId == currentTeamId;
-                  final isOtherTeam = team.teamId == otherTeamId;
-                  
-                  // Check if player count matches (only for Team 2 selection)
-                  final bool hasPlayerCountMismatch = requiredPlayerCount != null && 
-                                                       team.teamCount != requiredPlayerCount;
-                  
-                  final isDisabled = isOtherTeam || hasPlayerCountMismatch;
-                  
-                  String subtitle;
-                  if (isOtherTeam) {
-                    subtitle = 'Already selected';
-                  } else if (hasPlayerCountMismatch) {
-                    subtitle = '${team.teamCount} players (Need $requiredPlayerCount players)';
-                  } else {
-                    subtitle = '${team.teamCount} players';
-                  }
-                  
-                  return Opacity(
-                    opacity: isDisabled ? 0.4 : 1.0,
-                    child: ListTile(
-                      enabled: !isDisabled,
-                      title: Text(
-                        team.teamName,
-                        style: TextStyle(
-                          color: isSelected ? const Color(0xFF00C4FF) : Colors.white,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        ),
-                      ),
-                      subtitle: Text(
-                        subtitle,
-                        style: TextStyle(
-                          color: isDisabled ? Colors.red.shade300 : Colors.white60, 
-                          fontSize: 12
-                        ),
-                      ),
-                      leading: Icon(
-                        Icons.group,
-                        color: isSelected ? const Color(0xFF00C4FF) : Colors.white70,
-                      ),
-                      trailing: isSelected
-                          ? const Icon(Icons.check_circle, color: Color(0xFF00C4FF))
-                          : isDisabled
-                              ? const Icon(Icons.block, color: Colors.red)
-                              : null,
-                      onTap: isDisabled ? null : () {
-                        onChanged(team.teamId);
-                        Navigator.pop(context);
-                      },
+    builder: (context) => StatefulBuilder(
+      builder: (context, setDialogState) {
+        // ✅ Get fresh teams every time dialog rebuilds
+        final freshTeams = Team.getAll();
+
+        String? otherTeamId;
+        if (label == 'Team 1') {
+          otherTeamId = team2Id;
+        } else if (label == 'Team 2') {
+          otherTeamId = team1Id;
+        }
+
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1C2026),
+          title: Text('Select $label', style: const TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: freshTeams.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Text(
+                      'No teams available.\nPlease create teams first.',
+                      style: TextStyle(color: Colors.white70),
+                      textAlign: TextAlign.center,
                     ),
-                  );
-                },
-              ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-      ],
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: freshTeams.length,
+                    itemBuilder: (context, index) {
+                      final team = freshTeams[index];
+                      final isSelected = team.teamId == currentTeamId;
+                      final isOtherTeam = team.teamId == otherTeamId;
+
+                      final actualPlayerCount = PlayerStorage.getTeamPlayerCount(team.teamId);
+                      final bool hasInvalidPlayerCount = actualPlayerCount < 2 || actualPlayerCount > 11;
+                      final isDisabled = isOtherTeam || hasInvalidPlayerCount;
+
+                      String subtitle;
+                      if (isOtherTeam) {
+                        subtitle = 'Already selected';
+                      } else if (hasInvalidPlayerCount) {
+                        if (actualPlayerCount < 2) {
+                          subtitle = '$actualPlayerCount player${actualPlayerCount == 1 ? '' : 's'} (Minimum 2 required)';
+                        } else {
+                          subtitle = '$actualPlayerCount players (Maximum 11 allowed)';
+                        }
+                      } else {
+                        subtitle = '$actualPlayerCount players';
+                      }
+
+                      return Opacity(
+                        opacity: isDisabled ? 0.4 : 1.0,
+                        child: ListTile(
+                          enabled: !isDisabled,
+                          title: Text(
+                            team.teamName,
+                            style: TextStyle(
+                              color: isSelected ? const Color(0xFF00C4FF) : Colors.white,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            ),
+                          ),
+                          subtitle: Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: isDisabled ? Colors.red.shade300 : Colors.white60,
+                              fontSize: 12
+                            ),
+                          ),
+                          leading: Icon(
+                            Icons.group,
+                            color: isSelected ? const Color(0xFF00C4FF) : Colors.white70,
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: Color(0xFF00C4FF))
+                              : isDisabled
+                                  ? const Icon(Icons.block, color: Colors.red)
+                                  : GestureDetector(
+                                      onTap: () async {
+                                        // ✅ Close this dialog first
+                                        Navigator.pop(context);
+                                        
+                                        // ✅ Show add players dialog
+                                        await _showAddPlayersDialogWithRefresh(team);
+                                        
+                                        // ✅ Reopen team selection dialog with updated data
+                                        _showTeamSelectionDialog(label, currentTeamId, onChanged);
+                                      },
+                                      child: const Icon(Icons.add_circle_outline, color: Color(0xFF00C4FF)),
+                                    ),
+                          onTap: isDisabled ? null : () {
+                            onChanged(team.teamId);
+                            Navigator.pop(context);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
     ),
   );
 }
+
+Future<void> _showAddPlayersDialogWithRefresh(Team team) async {
+  TextEditingController playerNameController = TextEditingController();
+
+  final existingPlayers = PlayerStorage.getPlayersByTeam(team.teamId);
+  final existingPlayerNames = existingPlayers.map((p) => p.teamName.toLowerCase()).toSet();
+
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C2026),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add Player to ${team.teamName}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Builder(
+                  builder: (context) {
+                    final actualCount = PlayerStorage.getTeamPlayerCount(team.teamId);
+                    return Text(
+                      'Current: $actualCount/11 players',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontFamily: 'Poppins',
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            content: TextField(
+              controller: playerNameController,
+              maxLength: 30,
+              autofocus: true,
+              style: const TextStyle(color: Colors.black, fontFamily: 'Poppins'),
+              decoration: InputDecoration(
+                hintText: 'Enter player name',
+                hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                filled: true,
+                fillColor: const Color(0xFFD9D9D9),
+                counterText: '',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFD1D1D1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF00C4FF), width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onSubmitted: (_) {
+                _addPlayerAndUpdate(
+                  playerNameController,
+                  team,
+                  existingPlayerNames,
+                  setDialogState,
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(color: Colors.white70, fontFamily: 'Poppins'),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  _addPlayerAndUpdate(
+                    playerNameController,
+                    team,
+                    existingPlayerNames,
+                    setDialogState,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C4FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Add',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+void _showAddPlayersDialog(Team team) {
+  // Don't store controller as final - let it be garbage collected
+  TextEditingController playerNameController = TextEditingController();
+
+  final existingPlayers = PlayerStorage.getPlayersByTeam(team.teamId);
+  final existingPlayerNames = existingPlayers.map((p) => p.teamName.toLowerCase()).toSet();
+
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (BuildContext dialogContext) {
+      return StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: const Color(0xFF1C2026),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Add Player to ${team.teamName}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Builder(
+                  builder: (context) {
+                    final actualCount = PlayerStorage.getTeamPlayerCount(team.teamId);
+                    return Text(
+                      'Current: $actualCount/11 players',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontFamily: 'Poppins',
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            content: TextField(
+              controller: playerNameController,
+              maxLength: 30,
+              autofocus: true,
+              style: const TextStyle(color: Colors.black, fontFamily: 'Poppins'),
+              decoration: InputDecoration(
+                hintText: 'Enter player name',
+                hintStyle: const TextStyle(color: Color(0xFF9E9E9E)),
+                filled: true,
+                fillColor: const Color(0xFFD9D9D9),
+                counterText: '',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFFD1D1D1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Color(0xFF00C4FF), width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+              onSubmitted: (_) {
+                _addPlayerAndUpdate(
+                  playerNameController,
+                  team,
+                  existingPlayerNames,
+                  setDialogState,
+                );
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text(
+                  'Close',
+                  style: TextStyle(color: Colors.white70, fontFamily: 'Poppins'),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  _addPlayerAndUpdate(
+                    playerNameController,
+                    team,
+                    existingPlayerNames,
+                    setDialogState,
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00C4FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Add',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+  // ✅ NO DISPOSAL - Let Flutter's garbage collector handle it
+  // This is safe because the controller will be automatically cleaned up
+  // when there are no more references to it
+}
+
+
+void _addPlayerAndUpdate(
+  TextEditingController controller,
+  Team team,
+  Set<String> existingPlayerNames,
+  StateSetter setDialogState,
+) {
+  final playerName = controller.text.trim();
+
+  // Validation
+  if (playerName.isEmpty) {
+    _showSnackBar('Please enter a player name', Colors.orange);
+    return;
+  }
+
+  if (playerName.length < 2) {
+    _showSnackBar('Player name must be at least 2 characters', Colors.orange);
+    return;
+  }
+
+  final actualPlayerCount = PlayerStorage.getTeamPlayerCount(team.teamId);
+  if (actualPlayerCount >= 11) {
+    _showSnackBar('Maximum 11 players allowed', Colors.red);
+    return;
+  }
+
+  final lowerPlayerName = playerName.toLowerCase();
+
+  if (existingPlayerNames.contains(lowerPlayerName)) {
+    _showSnackBar('Player "$playerName" already exists in this team', Colors.red);
+    return;
+  }
+
+  try {
+    // Add single player to team
+    PlayerStorage.addPlayer(team.teamId, playerName);
+
+    // Get actual count from database after adding
+    final newCount = PlayerStorage.getTeamPlayerCount(team.teamId);
+    team.updateCount(newCount);
+
+    // Show success message
+    _showSnackBar('Player "$playerName" added to ${team.teamName}', Colors.green);
+
+    // Clear input field
+    controller.clear();
+
+    // Refresh the dialog state to update the counter
+    setDialogState(() {
+      existingPlayerNames.add(lowerPlayerName);
+    });
+
+    // ✅ CRITICAL: Update the main page state immediately
+    if (mounted) {
+      setState(() {
+        // This triggers a rebuild of the main page
+        // The team selection dialog will show updated counts
+      });
+    }
+  } catch (e) {
+    _showSnackBar('Error adding player: $e', Colors.red);
+  }
+}
+
   Widget _buildTossDetailsSection(double w) {
     return Container(
       width: double.infinity,

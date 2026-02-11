@@ -422,7 +422,7 @@
     },
     {
       "id": "10:5806601655359689055",
-      "lastPropertyId": "14:635985052740576954",
+      "lastPropertyId": "16:5322401988592280024",
       "name": "MatchHistory",
       "properties": [
         {
@@ -497,6 +497,16 @@
           "id": "14:635985052740576954",
           "name": "isCompleted",
           "type": 1
+        },
+        {
+          "id": "15:1774263244797067470",
+          "name": "isPaused",
+          "type": 1
+        },
+        {
+          "id": "16:5322401988592280024",
+          "name": "pausedState",
+          "type": 9
         }
       ],
       "relations": []

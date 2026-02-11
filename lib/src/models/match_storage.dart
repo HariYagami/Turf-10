@@ -160,6 +160,9 @@ class MatchStorage {
   static bool matchExists(String matchId) {
     return Match.getByMatchId(matchId) != null;
   }
+  static Match? getByMatchId(String matchId) {
+  return Match.getByMatchId(matchId);
+}
 
   /// Get head-to-head statistics between two teams
   static Map<String, dynamic> getHeadToHeadStats(String teamId1, String teamId2) {

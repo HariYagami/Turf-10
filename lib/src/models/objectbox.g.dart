@@ -514,7 +514,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(10, 5806601655359689055),
     name: 'MatchHistory',
-    lastPropertyId: const obx_int.IdUid(14, 635985052740576954),
+    lastPropertyId: const obx_int.IdUid(16, 5322401988592280024),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -600,6 +600,18 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(14, 635985052740576954),
         name: 'isCompleted',
         type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(15, 1774263244797067470),
+        name: 'isPaused',
+        type: 1,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(16, 5322401988592280024),
+        name: 'pausedState',
+        type: 9,
         flags: 0,
       ),
     ],
@@ -1361,7 +1373,10 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final teamBIdOffset = fbb.writeString(object.teamBId);
         final matchTypeOffset = fbb.writeString(object.matchType);
         final resultOffset = fbb.writeString(object.result);
-        fbb.startTable(15);
+        final pausedStateOffset = object.pausedState == null
+            ? null
+            : fbb.writeString(object.pausedState!);
+        fbb.startTable(17);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, matchIdOffset);
         fbb.addOffset(2, teamAIdOffset);
@@ -1376,6 +1391,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addFloat64(11, object.team2Overs);
         fbb.addOffset(12, resultOffset);
         fbb.addBool(13, object.isCompleted);
+        fbb.addBool(14, object.isPaused);
+        fbb.addOffset(15, pausedStateOffset);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -1448,6 +1465,15 @@ obx_int.ModelDefinition getObjectBoxModel() {
           30,
           false,
         );
+        final isPausedParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          32,
+          false,
+        );
+        final pausedStateParam = const fb.StringReader(
+          asciiOptimization: true,
+        ).vTableGetNullable(buffer, rootOffset, 34);
         final object = MatchHistory(
           id: idParam,
           matchId: matchIdParam,
@@ -1463,6 +1489,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
           team2Overs: team2OversParam,
           result: resultParam,
           isCompleted: isCompletedParam,
+          isPaused: isPausedParam,
+          pausedState: pausedStateParam,
         );
 
         return object;
@@ -1896,5 +1924,15 @@ class MatchHistory_ {
   /// See [MatchHistory.isCompleted].
   static final isCompleted = obx.QueryBooleanProperty<MatchHistory>(
     _entities[7].properties[13],
+  );
+
+  /// See [MatchHistory.isPaused].
+  static final isPaused = obx.QueryBooleanProperty<MatchHistory>(
+    _entities[7].properties[14],
+  );
+
+  /// See [MatchHistory.pausedState].
+  static final pausedState = obx.QueryStringProperty<MatchHistory>(
+    _entities[7].properties[15],
   );
 }
