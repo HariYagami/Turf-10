@@ -298,81 +298,60 @@ class _ScoreboardPageState extends State<ScoreboardPage> {
                 ),
                 
 
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
+           Expanded(
+  child: SingleChildScrollView(
+    padding: const EdgeInsets.all(16.0),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // First Innings Section
+        if (firstInnings != null && firstInningsScore != null)
+          _buildInningsSection(
+            firstInnings,
+            firstInningsScore,
+            match,
+            isExpanded: _isFirstInningsExpanded,
+            onToggle: () {
+              setState(() {
+                _isFirstInningsExpanded =
+                    !_isFirstInningsExpanded;
+              });
+            },
+          ),
 
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Target message (if second innings)
-                      if (secondInnings != null &&
-                          secondInnings.hasValidTarget &&
-                          secondInningsScore != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1C1F24),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${Team.getById(secondInnings.battingTeamId)?.teamName ?? "Team"} need ${secondInnings.targetRuns - secondInningsScore.totalRuns} runs to win.',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
+        const SizedBox(height: 16),
 
-                      // First Innings Section
-                      if (firstInnings != null && firstInningsScore != null)
-                        _buildInningsSection(
-                          firstInnings,
-                          firstInningsScore,
-                          match,
-                          isExpanded: _isFirstInningsExpanded,
-                          onToggle: () {
-                            setState(() {
-                              _isFirstInningsExpanded =
-                                  !_isFirstInningsExpanded;
-                            });
-                          },
-                        ),
+        // Second Innings Section
+        if (secondInnings != null && secondInningsScore != null)
+          _buildInningsSection(
+            secondInnings,
+            secondInningsScore,
+            match,
+            isExpanded: _isSecondInningsExpanded,
+            onToggle: () {
+              setState(() {
+                _isSecondInningsExpanded =
+                    !_isSecondInningsExpanded;
+              });
+            },
+          ),
 
-                      const SizedBox(height: 16),
+        const SizedBox(height: 20),
 
-                      // Second Innings Section
-                      if (secondInnings != null && secondInningsScore != null)
-                        _buildInningsSection(
-                          secondInnings,
-                          secondInningsScore,
-                          match,
-                          isExpanded: _isSecondInningsExpanded,
-                          onToggle: () {
-                            setState(() {
-                              _isSecondInningsExpanded =
-                                  !_isSecondInningsExpanded;
-                            });
-                          },
-                        ),
-
-                      const SizedBox(height: 20),
-
-                      // Last updated timestamp
-                      Center(
-                        child: Text(
-                          'Last updated: ${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}',
-                          style: const TextStyle(
-                            color: Color(0xFF9AA0A6),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+        // Last updated timestamp
+        Center(
+          child: Text(
+            'Last updated: ${DateTime.now().hour.toString().padLeft(2, '0')}:${DateTime.now().minute.toString().padLeft(2, '0')}:${DateTime.now().second.toString().padLeft(2, '0')}',
+            style: const TextStyle(
+              color: Color(0xFF9AA0A6),
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+),
             ],
           ),
         ),
