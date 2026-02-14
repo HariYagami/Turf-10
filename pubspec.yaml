@@ -39,6 +39,7 @@ dependencies:
   fl_chart: ^0.68.0
   shared_preferences: ^2.2.2
   printing: ^5.11.0
+
   path: ^1.8.3
   lottie: ^3.1.0
   # The following adds the Cupertino Icons font to your application.
@@ -115,6 +116,8 @@ flutter:
     - assets/images/CRICKET OUT ANIMATION.lottie
     - assets/images/Scored 4.lottie
     - assets/images/SIX ANIMATION.lottie
+    - assets/images/Sports loader.json
+    - assets/images/Cricket bat & ball bouncing loader.json
 
 
 

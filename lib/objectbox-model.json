@@ -67,7 +67,7 @@
     },
     {
       "id": "3:2775877443378871095",
-      "lastPropertyId": "9:6693471586032238203",
+      "lastPropertyId": "10:2298727709586105540",
       "name": "Match",
       "properties": [
         {
@@ -117,6 +117,11 @@
           "id": "9:6693471586032238203",
           "name": "overs",
           "type": 6
+        },
+        {
+          "id": "10:2298727709586105540",
+          "name": "matchStartTime",
+          "type": 10
         }
       ],
       "relations": []
@@ -422,7 +427,7 @@
     },
     {
       "id": "10:5806601655359689055",
-      "lastPropertyId": "16:5322401988592280024",
+      "lastPropertyId": "18:8521639436395831779",
       "name": "MatchHistory",
       "properties": [
         {
@@ -507,6 +512,16 @@
           "id": "16:5322401988592280024",
           "name": "pausedState",
           "type": 9
+        },
+        {
+          "id": "17:770028222179395096",
+          "name": "matchStartTime",
+          "type": 10
+        },
+        {
+          "id": "18:8521639436395831779",
+          "name": "matchEndTime",
+          "type": 10
         }
       ],
       "relations": []

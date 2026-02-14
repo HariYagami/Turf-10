@@ -99,7 +99,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(3, 2775877443378871095),
     name: 'Match',
-    lastPropertyId: const obx_int.IdUid(9, 6693471586032238203),
+    lastPropertyId: const obx_int.IdUid(10, 2298727709586105540),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -155,6 +155,12 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(9, 6693471586032238203),
         name: 'overs',
         type: 6,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(10, 2298727709586105540),
+        name: 'matchStartTime',
+        type: 10,
         flags: 0,
       ),
     ],
@@ -514,7 +520,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(10, 5806601655359689055),
     name: 'MatchHistory',
-    lastPropertyId: const obx_int.IdUid(16, 5322401988592280024),
+    lastPropertyId: const obx_int.IdUid(18, 8521639436395831779),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -612,6 +618,18 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(16, 5322401988592280024),
         name: 'pausedState',
         type: 9,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(17, 770028222179395096),
+        name: 'matchStartTime',
+        type: 10,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(18, 8521639436395831779),
+        name: 'matchEndTime',
+        type: 10,
         flags: 0,
       ),
     ],
@@ -819,7 +837,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final teamId1Offset = fbb.writeString(object.teamId1);
         final teamId2Offset = fbb.writeString(object.teamId2);
         final tossWonByOffset = fbb.writeString(object.tossWonBy);
-        fbb.startTable(10);
+        fbb.startTable(11);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, matchIdOffset);
         fbb.addOffset(2, teamId1Offset);
@@ -829,12 +847,18 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addInt64(6, object.noballFlag);
         fbb.addInt64(7, object.wideFlag);
         fbb.addInt64(8, object.overs);
+        fbb.addInt64(9, object.matchStartTime?.millisecondsSinceEpoch);
         fbb.finish(fbb.endTable());
         return object.id;
       },
       objectFromFB: (obx.Store store, ByteData fbData) {
         final buffer = fb.BufferContext(fbData);
         final rootOffset = buffer.derefObject(0);
+        final matchStartTimeValue = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          22,
+        );
         final idParam = const fb.Int64Reader().vTableGet(
           buffer,
           rootOffset,
@@ -877,6 +901,9 @@ obx_int.ModelDefinition getObjectBoxModel() {
           20,
           0,
         );
+        final matchStartTimeParam = matchStartTimeValue == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(matchStartTimeValue);
         final object = Match(
           id: idParam,
           matchId: matchIdParam,
@@ -887,6 +914,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           noballFlag: noballFlagParam,
           wideFlag: wideFlagParam,
           overs: oversParam,
+          matchStartTime: matchStartTimeParam,
         );
 
         return object;
@@ -1376,7 +1404,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final pausedStateOffset = object.pausedState == null
             ? null
             : fbb.writeString(object.pausedState!);
-        fbb.startTable(17);
+        fbb.startTable(19);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, matchIdOffset);
         fbb.addOffset(2, teamAIdOffset);
@@ -1393,12 +1421,24 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addBool(13, object.isCompleted);
         fbb.addBool(14, object.isPaused);
         fbb.addOffset(15, pausedStateOffset);
+        fbb.addInt64(16, object.matchStartTime?.millisecondsSinceEpoch);
+        fbb.addInt64(17, object.matchEndTime?.millisecondsSinceEpoch);
         fbb.finish(fbb.endTable());
         return object.id;
       },
       objectFromFB: (obx.Store store, ByteData fbData) {
         final buffer = fb.BufferContext(fbData);
         final rootOffset = buffer.derefObject(0);
+        final matchStartTimeValue = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          36,
+        );
+        final matchEndTimeValue = const fb.Int64Reader().vTableGetNullable(
+          buffer,
+          rootOffset,
+          38,
+        );
         final idParam = const fb.Int64Reader().vTableGet(
           buffer,
           rootOffset,
@@ -1474,6 +1514,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final pausedStateParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 34);
+        final matchStartTimeParam = matchStartTimeValue == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(matchStartTimeValue);
+        final matchEndTimeParam = matchEndTimeValue == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(matchEndTimeValue);
         final object = MatchHistory(
           id: idParam,
           matchId: matchIdParam,
@@ -1491,6 +1537,8 @@ obx_int.ModelDefinition getObjectBoxModel() {
           isCompleted: isCompletedParam,
           isPaused: isPausedParam,
           pausedState: pausedStateParam,
+          matchStartTime: matchStartTimeParam,
+          matchEndTime: matchEndTimeParam,
         );
 
         return object;
@@ -1588,6 +1636,11 @@ class Match_ {
   /// See [Match.overs].
   static final overs = obx.QueryIntegerProperty<Match>(
     _entities[2].properties[8],
+  );
+
+  /// See [Match.matchStartTime].
+  static final matchStartTime = obx.QueryDateProperty<Match>(
+    _entities[2].properties[9],
   );
 }
 
@@ -1934,5 +1987,15 @@ class MatchHistory_ {
   /// See [MatchHistory.pausedState].
   static final pausedState = obx.QueryStringProperty<MatchHistory>(
     _entities[7].properties[15],
+  );
+
+  /// See [MatchHistory.matchStartTime].
+  static final matchStartTime = obx.QueryDateProperty<MatchHistory>(
+    _entities[7].properties[16],
+  );
+
+  /// See [MatchHistory.matchEndTime].
+  static final matchEndTime = obx.QueryDateProperty<MatchHistory>(
+    _entities[7].properties[17],
   );
 }

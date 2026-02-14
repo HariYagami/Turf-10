@@ -473,40 +473,37 @@ Widget _buildNavItem({
   );
 }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'Teams',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w600,
+ Widget _buildHeader() {
+  return Padding(
+    padding: const EdgeInsets.all(16.0),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Teams',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Row(
+          children: [
+            const SizedBox(width: 10),
+            const Icon(Icons.support_agent, color: Colors.white, size: 26),
+            const SizedBox(width: 10),
+            Opacity(
+              opacity: 0.90,
+              child: const Icon(Icons.settings, color: Colors.white, size: 26),
             ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.storage, color: Colors.white, size: 26),
-                onPressed: _showAllData,
-              ),
-              const SizedBox(width: 10),
-              const Icon(Icons.support_agent, color: Colors.white, size: 26),
-              const SizedBox(width: 10),
-              Opacity(
-                opacity: 0.90,
-                child: const Icon(Icons.settings, color: Colors.white, size: 26),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
 
   Widget _buildEmptyState() {
     return Center(

@@ -460,14 +460,18 @@ Future<void> _sendInitialLEDData({
     debugPrint('║     SENDING MATCH DATA TO LED          ║');
     debugPrint('╚════════════════════════════════════════╝');
 
-    // ── STEP 1: CLEAR ENTIRE SCREEN ──────────────────────────────────────────
-    debugPrint('📍 Step 1: Sending FILL clear command...');
-    await bleService.sendRawCommands(['FILL 0 0 127 127 0 0 0']);
-
-    // ── STEP 2: LONG PAUSE — let ESP32 finish rendering the FILL ─────────────
-    // 800ms was too short. ESP32 queues commands; if new commands arrive before
-    // FILL completes they render on top of the old static content.
-    debugPrint('📍 Step 2: Waiting 1500ms for FILL to complete on ESP32...');
+    // ── STEP 1: TRIPLE CLEAR FOR COMPLETE BLACKOUT ──────────────────────────
+    debugPrint('📍 Step 1: Clearing display (triple clear)...');
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    await bleService.sendRawCommands(['CLEAR']);
+    
+    // ── STEP 2: EXTENDED PAUSE FOR ESP32 TO FULLY PROCESS ───────────────────
+    debugPrint('📍 Step 2: Waiting 1500ms for display to stabilize...');
     await Future.delayed(const Duration(milliseconds: 1500));
 
     // ── STEP 3: PREPARE DATA ─────────────────────────────────────────────────
@@ -482,7 +486,6 @@ Future<void> _sendInitialLEDData({
     final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     const int temp = 27;
 
-    // Truncate + uppercase to fit LED character grid
     String trunc(String name) =>
         (name.length > 6 ? name.substring(0, 6) : name).toUpperCase();
 
@@ -495,50 +498,63 @@ Future<void> _sendInitialLEDData({
                'Non-Striker: $nonStrikerName | Bowler: $bowlerName');
     debugPrint('   Time: $timeStr | Temp: ${temp}°C');
 
-    // ── STEP 4: HEADER ROW (time + temperature) ──────────────────────────────
-    // CHANGE = atomic clear-region + write → zero overlay risk
-    debugPrint('📍 Step 4: Sending header (time & temp)...');
+    // ── STEP 4-8: DRAW LAYOUT WITH PROPER DELAYS ─────────────────────────────
+    debugPrint('📍 Step 4: Drawing header...');
     await bleService.sendRawCommands([
-      'CHANGE 3 2 33 10 1 255 255 200 $timeStr',
-      'CHANGE 102 2 22 10 1 200 255 200 ${temp}C',
+      'TEXT 3 2 1 255 255 200 $timeStr',
+      'TEXT 36 2 1 200 200 255 AEROBIOSYS',
+      'TEXT 102 2 1 200 255 200 ${temp}C',
     ]);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // ── STEP 5: TEAM NAME ROW ────────────────────────────────────────────────
-    debugPrint('📍 Step 5: Sending team name...');
+    debugPrint('📍 Step 5: Drawing team name...');
     await bleService.sendRawCommands([
-      'CHANGE 15 17 40 10 1 0 255 255 $teamName',
+      'LINE H 0 12 127 12 1 255 255 255',
+    ]);
+    await Future.delayed(const Duration(milliseconds: 250));
+    
+    await bleService.sendRawCommands([
+      'TEXT 15 17 1 0 255 255 $teamName',
     ]);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // ── STEP 6: SCORE AREA (runs / wickets / overs / CRR) ────────────────────
-    debugPrint('📍 Step 6: Sending score placeholders...');
+    debugPrint('📍 Step 6: Drawing score area...');
     await bleService.sendRawCommands([
-      'CHANGE 50  30 35 18 2 255 255 255 0',     // Runs  (large font=2)
-      'CHANGE 104 30 33 18 2 255 255 255 0',     // Wickets
-      'CHANGE 29  50 26 10 1 255 255   0 0.00',  // CRR
-      'CHANGE 84  50 16 10 1   0 255   0 0.0',   // Overs
+      'TEXT 17 30 2 255 0 255 SCR:',
+      'TEXT 67 30 2 255 255 255 0',
+      'TEXT 100 30 2 255 100 100 /',
+      'TEXT 112 30 2 255 255 255 0',
     ]);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // ── STEP 7: BOWLER ROW ───────────────────────────────────────────────────
-    debugPrint('📍 Step 7: Sending bowler info...');
+    debugPrint('📍 Step 7: Drawing CRR and overs...');
     await bleService.sendRawCommands([
-      'CHANGE 10 60 32 10 1 255 200 200 $bowlerName',
-      'CHANGE 58 60 24 10 1   0 255   0 0/0',
-      'CHANGE 84 60 20 10 1   0 255   0 (0.0)',
+      'TEXT 5 50 1 255 255 0 CRR:',
+      'TEXT 29 50 1 255 255 0 0.00',
+      'TEXT 70 50 1 0 255 0 OVR:',
+      'TEXT 94 50 1 0 255 0 0.0',
     ]);
     await Future.delayed(const Duration(milliseconds: 300));
 
-    // ── STEP 8: BATSMEN ROWS ─────────────────────────────────────────────────
-    debugPrint('📍 Step 8: Sending batsmen info...');
+    debugPrint('📍 Step 8: Drawing bowler...');
     await bleService.sendRawCommands([
-      'CHANGE 10 76 32 10 1 255 255 255 $strikerName',
-      'CHANGE 46 76 82 10 1 200 255 200 0(0)',
-      'CHANGE 10 85 32 10 1 200 200 255 $nonStrikerName',
-      'CHANGE 46 85 82 10 1 200 255 200 0(0)',
+      'TEXT 10 60 1 255 200 200 $bowlerName',
+      'TEXT 58 60 1 0 255 0 0',
+      'TEXT 64 60 1 0 255 0 /',
+      'TEXT 70 60 1 0 255 0 0',
+      'TEXT 82 60 1 0 255 0 (0.0)',
     ]);
     await Future.delayed(const Duration(milliseconds: 300));
+
+    debugPrint('📍 Step 9: Drawing batsmen...');
+    await bleService.sendRawCommands([
+      'LINE H 0 70 127 70 1 255 255 255',
+      'TEXT 2 74 1 255 0 0 *',
+      'TEXT 8 74 1 200 255 255 $strikerName',
+      'TEXT 58 74 1 200 255 200 0(0)',
+      'TEXT 8 84 1 200 200 255 $nonStrikerName',
+      'TEXT 58 84 1 200 255 200 0(0)',
+    ]);
 
     debugPrint('╔════════════════════════════════════════╗');
     debugPrint('║  ✅ LED DISPLAY INITIALISED OK         ║');
@@ -826,40 +842,22 @@ Future<void> _sendInitialLEDData({
                                   ],
                                 ),
                               ),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Debug button for viewing match data
-                                  GestureDetector(
-                                    onTap: _showMatchDataDialog,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: const Icon(
-                                        Icons.bug_report,
-                                        color: Color(0xFF00C4FF),
-                                        size: 22,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Icon(
-                                    Icons.headphones,
-                                    color: Colors.white70,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  const Icon(
-                                    Icons.settings,
-                                    color: Colors.white70,
-                                    size: 22,
-                                  ),
-                                ],
-                              ),
-                            ],
+                       Row(
+  mainAxisSize: MainAxisSize.min,
+  children: [
+    const Icon(
+      Icons.headphones,
+      color: Colors.white70,
+      size: 22,
+    ),
+    const SizedBox(width: 12),
+    const Icon(
+      Icons.settings,
+      color: Colors.white70,
+      size: 22,
+    ),
+  ],
+),                        ],
                           ),
                         ),
 

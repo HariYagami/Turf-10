@@ -240,14 +240,22 @@ void initState() {
     _envService.testWeatherAPI();
   });
 
-  // 🔥 Periodic time+temp update every 60 seconds
-  _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
-    print('⏰ CricketScorerScreen: Periodic LED update triggered');
-    _updateLEDTimeAndTemp();
-  });
+  // 🔥 DO NOT START TIMER HERE - START ONLY AFTER LAYOUT IS READY
+  // Timer will be started in _sendFullLEDLayout() or _sendSecondInningsIntroLayout()
 
   // 🔥 FIX: Initialize match WITHOUT immediate LED drawing
   _initializeMatch();
+}
+
+@override
+void dispose() {
+  _scrollController.dispose();
+  
+  // Cancel periodic timer
+  _ledUpdateTimer?.cancel();
+  debugPrint('⏹️ Stopped periodic time/temp updates');
+  
+  super.dispose();
 }
 
 Future<void> _initializeMatch() async {
@@ -277,32 +285,61 @@ Future<void> _initializeMatch() async {
       currentScore!.save();
     }
 
-    // 🔥 FIX: Update UI state FIRST (remove loading screen)
     setState(() => isInitializing = false);
-
-    // 🔥 FIX: WAIT for frame to render, THEN start Bluetooth sequence
     await Future.delayed(const Duration(milliseconds: 100));
     
     final isSecond = currentInnings!.isSecondInnings;
     
-    // Wait for Bluetooth connection (with timeout)
     await _waitForBluetoothConnection();
     
-    // 🔥 CRITICAL: Longer delay to ensure connection is fully stable
-    await Future.delayed(const Duration(milliseconds: 800));
+    // 🔥 CRITICAL: Extended delay for stable connection
+    await Future.delayed(const Duration(milliseconds: 2000));
     
-    // Now clear display
-    debugPrint('🧹 Clearing display before drawing layout...');
-    await _clearLEDDisplay();
+    debugPrint('🧹 Clearing display before drawing layout (triple clear)...');
+    final bleService = BleManagerService();
     
-    // 🔥 CRITICAL: Wait for clear to fully complete
+    if (bleService.isConnected) {
+      // First clear
+      debugPrint('🧹 CLEAR 1/3');
+      await bleService.sendRawCommands(['CLEAR']);
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      // Second clear
+      debugPrint('🧹 CLEAR 2/3');
+      await bleService.sendRawCommands(['CLEAR']);
+      await Future.delayed(const Duration(milliseconds: 1000));
+      
+      // Third clear
+      debugPrint('🧹 CLEAR 3/3');
+      await bleService.sendRawCommands(['CLEAR']);
+      
+      // 🔥 CRITICAL: MASSIVE delay to ensure display is completely blank and ready
+      // The LED needs time to:
+      // 1. Process all 3 CLEAR commands in queue
+      // 2. Clear internal framebuffer
+      // 3. Render blank screen
+      // 4. Return to idle state ready for new data
+      debugPrint('⏳ Waiting 4 seconds for display to fully stabilize...');
+      await Future.delayed(const Duration(seconds: 4));
+      
+      debugPrint('✅ Display cleared and fully stabilized - ready to draw');
+    } else {
+      debugPrint('⚠️ BLE not connected - skipping clear');
+    }
+    
+    // 🔥 CRITICAL: Long delay before layout to ensure LED is in clean idle state
+    debugPrint('⏳ Waiting 1 second before sending layout...');
     await Future.delayed(const Duration(milliseconds: 1000));
+    
+    // Save match start time
     final existingHistory = MatchHistory.getByMatchId(widget.matchId);
     if (existingHistory != null && existingHistory.matchStartTime == null) {
-  existingHistory.matchStartTime = DateTime.now();
-  existingHistory.save();
-}  
+      existingHistory.matchStartTime = DateTime.now();
+      existingHistory.save();
+    }  
+    
     // Draw appropriate layout
+    debugPrint('🎨 Starting layout render...');
     if (isSecond) {
       await _sendSecondInningsIntroLayout();
     } else {
@@ -314,6 +351,7 @@ Future<void> _initializeMatch() async {
     _showErrorDialog('Failed to load match: $e');
   }
 }
+
 
 
 // 🔥 NEW: Helper method to wait for Bluetooth connection
@@ -461,13 +499,14 @@ int _rightAlignX(String text, int scale, int rightEdge) {
     // before the next batch arrives. 150ms was too fast, causing cascading text overlap.
     const int delayBetweenRows = 250;
 
-    // ── ROW 1 (y=2): Header — time + org + temp ──────────────────────────
-    await bleService.sendRawCommands([
-      'TEXT 3 2 1 255 255 200 $timeStr',
-      'TEXT 36 2 1 200 200 255 AEROBIOSYS',
-      'TEXT 102 2 1 200 255 200 ${temp}C',
-    ]);
-    await Future.delayed(Duration(milliseconds: delayBetweenRows));
+   // ── ROW 1 (y=2): Header — time + org + temp ──────────────────────────
+await bleService.sendRawCommands([
+  'TEXT 3 2 1 255 255 200 $timeStr',
+  'TEXT 36 2 1 200 200 255 AEROBIOSYS',
+  'TEXT 102 2 1 200 255 200 ${temp}C',
+]);
+// 🔥 FIX: Increased from 250ms to 350ms for first row after long clear period
+await Future.delayed(const Duration(milliseconds: 350));
 
 // ── ROW 2 (y=12+17): Divider + centered team names ───────────────────
 // Layout spec:
@@ -528,10 +567,10 @@ await Future.delayed(Duration(milliseconds: delayBetweenRows));
 await bleService.sendRawCommands([
   'TEXT 5 50 1 255 255 0 CRR:',
   'TEXT 29 50 1 255 255 0 $crr',
-  'TEXT 70 50 1 0 255 0 OVR:',
-  'TEXT 94 50 1 0 255 0 $overs(${currentMatch!.overs})',
+  'TEXT 66 50 1 0 255 0 OVR:',
+  'TEXT 90 50 1 0 255 0 $overs(${currentMatch!.overs})',
 ]);
-await Future.delayed(Duration(milliseconds: delayBetweenRows));
+await Future.delayed(const Duration(milliseconds: 150));
 
     // ── ROW 5 (y=60): Bowler ─────────────────────────────────────────────
     await bleService.sendRawCommands([
@@ -553,7 +592,20 @@ await Future.delayed(Duration(milliseconds: delayBetweenRows));
       'TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
     ]);
 
-    debugPrint('✅ Full LED layout drawn');
+  debugPrint('✅ Full LED layout drawn');
+    
+    // 🔥 START PERIODIC TIME/TEMP UPDATE ONLY AFTER LAYOUT IS COMPLETELY READY
+    // CRITICAL: Only start timer once, check if already running
+    if (_ledUpdateTimer == null || !_ledUpdateTimer!.isActive) {
+      // Wait 1 extra second to ensure layout is fully stable on LED
+      await Future.delayed(const Duration(seconds: 1));
+      
+      _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+        debugPrint('⏰ CricketScorerScreen: Periodic LED update triggered');
+        _updateLEDTimeAndTemp();
+      });
+      debugPrint('🔄 Started periodic time/temp updates (60s interval) - LAYOUT FULLY COMPLETE');
+    }
 
   } catch (e) {
     debugPrint('❌ _sendFullLEDLayout failed: $e');
@@ -718,7 +770,7 @@ Future<void> _sendSecondInningsIntroLayout() async {
     await bleService.sendRawCommands([
       'LINE H 0 62 127 62 1 255 200 0',
       'TEXT $targetGroupX 68 1 255 200 0 $targetLabel',
-      'TEXT $targetNumX 68 2 255 255 0 $targetRuns',
+      'TEXT $targetNumX 68 1 255 255 0 $targetRuns',
     ]);
     await Future.delayed(const Duration(milliseconds: 250));
 
@@ -840,13 +892,25 @@ Future<void> _sendSecondInningsIntroLayout() async {
       'TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
     ]);
 
-    debugPrint('✅ Second innings LED layout drawn');
+ debugPrint('✅ Second innings LED layout drawn');
+    
+    // 🔥 START PERIODIC TIME/TEMP UPDATE ONLY AFTER LAYOUT IS COMPLETELY READY
+    // CRITICAL: Only start timer once, check if already running
+    if (_ledUpdateTimer == null || !_ledUpdateTimer!.isActive) {
+      // Wait 1 extra second to ensure layout is fully stable on LED
+      await Future.delayed(const Duration(seconds: 1));
+      
+      _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
+        debugPrint('⏰ CricketScorerScreen: Periodic LED update triggered');
+        _updateLEDTimeAndTemp();
+      });
+      debugPrint('🔄 Started periodic time/temp updates (60s interval) - LAYOUT FULLY COMPLETE');
+    }
 
   } catch (e) {
     debugPrint('❌ _sendSecondInningsIntroLayout failed: $e');
   }
 }
-
 
 void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
   currentInnings?.markCompleted();
@@ -942,32 +1006,43 @@ void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
   });
 }
 
-// Save incomplete match to history as paused
 Future<void> _clearLEDDisplay() async {
   try {
     final bleService = BleManagerService();
-    
+
     if (!bleService.isConnected) {
       debugPrint('⚠️ Bluetooth not connected. Skipping LED clear.');
       return;
     }
-    
-    debugPrint('🧹 Clearing LED display...');
-    
-    // 🔥 FIX: Single clear command with proper delay
+
+    debugPrint('🧹 Clearing LED display (triple clear)...');
+
+    // First clear
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Second clear (confirmation)
+    await bleService.sendRawCommands(['CLEAR']);
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Third clear (guarantee complete blackout)
     await bleService.sendRawCommands(['CLEAR']);
     await Future.delayed(const Duration(milliseconds: 300));
-    
-    // Confirmation clear
-    await bleService.sendRawCommands(['CLEAR']);
-    
-    debugPrint('✅ LED display cleared');
-    
+
+    debugPrint('✅ LED display cleared (triple clear complete)');
+
+    // 🔥 NEW: Auto-reconnect Bluetooth after clearing LED
+    // This silently reconnects in the background without user interaction
+    debugPrint('🔄 LED clear complete, initiating auto-reconnect...');
+    Future.delayed(const Duration(milliseconds: 500), () {
+      bleService.autoReconnect();
+    });
+
   } catch (e) {
     debugPrint('❌ LED clear failed: $e');
-    // Don't retry immediately - could cause more overlap
   }
 }
+
 
 void _saveMatchState() {
   try {
@@ -2959,7 +3034,7 @@ Future<void> _updateLEDAfterScore() async {
       'CHANGE 112 30 16 14 2 255 255 255 $wickets',    // Wickets: width=16 (clears 112-127, enough for 2 digits)
 // CRR and overs
 'CHANGE 29  50 29 10 1 255 255 0   $crr',
-'CHANGE 94  50 20 10 1 0   255 0   $overs',
+'CHANGE 90  50 20 10 1 0   255 0   $overs',
       // Bowler: name + stats
       'CHANGE 10  60 46 10 1 255 200 200 $bowlerName',
       'CHANGE 58  60 22 10 1 0   255 0   $bowlerWkts',

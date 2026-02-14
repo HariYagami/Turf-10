@@ -1,4 +1,5 @@
 import 'package:TURF_TOWN_/src/Pages/Teams/TeamPage.dart';
+import 'package:TURF_TOWN_/src/views/history_page.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:TURF_TOWN_/src/Pages/Teams/playerselection_page.dart';
 import 'package:TURF_TOWN_/src/views/Home.dart';
 import 'package:TURF_TOWN_/src/models/team.dart';
+import 'package:TURF_TOWN_/src/models/match_history.dart';
 import 'package:TURF_TOWN_/src/models/match_storage.dart';
 import 'package:TURF_TOWN_/src/models/player_storage.dart';
 
@@ -312,8 +314,8 @@ Widget _buildDrawer() {
     child: ListView(
       padding: EdgeInsets.zero,
       children: [
-        const DrawerHeader(
-          decoration: BoxDecoration(
+        DrawerHeader(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -324,55 +326,378 @@ Widget _buildDrawer() {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'Cricket Scorer',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
+              const Row(
+                children: [
+                  Icon(
+                    Icons.sports_cricket,
+                    color: Color(0xFF00C4FF),
+                    size: 32,
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Cricket Scorer',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
-                'Menu',
+                'Manage your cricket matches',
                 style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
                 ),
               ),
             ],
           ),
         ),
-      ListTile(
-  leading: const Icon(Icons.group, color: Colors.white),
-  title: const Text('Teams', style: TextStyle(color: Colors.white)),
-  onTap: () async {
-    Navigator.pop(context);
-    await Navigator.push(
-      context,
-      SmoothPageRoute(page: const NewTeamsPage()),  // Changed this line
-    );
-    _loadTeams();
-  },
-),
+        
+        // Home
         ListTile(
-          leading: const Icon(Icons.scoreboard, color: Colors.white),
-          title: const Text('Scorecard', style: TextStyle(color: Colors.white)),
+          leading: const Icon(Icons.home, color: Color(0xFF00C4FF)),
+          title: const Text('Home', style: TextStyle(color: Colors.white)),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const Home()),
+              (route) => false,
+            );
+          },
+        ),
+        
+        const Divider(color: Colors.white24, height: 1),
+        
+        // New Match (Current Page)
+        ListTile(
+          leading: const Icon(Icons.add_circle, color: Color(0xFF00C4FF)),
+          title: const Text('New Match', style: TextStyle(color: Colors.white)),
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFF00C4FF).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF00C4FF), width: 1),
+            ),
+            child: const Text(
+              'Current',
+              style: TextStyle(
+                color: Color(0xFF00C4FF),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          onTap: () {
+            Navigator.pop(context);
+          },
+        ),
+        
+        const Divider(color: Colors.white24, height: 1),
+        
+        // Teams
+        ListTile(
+          leading: const Icon(Icons.group, color: Colors.white),
+          title: const Text('Teams', style: TextStyle(color: Colors.white)),
+          subtitle: Text(
+            'Manage teams & players',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+          ),
+          onTap: () async {
+            Navigator.pop(context);
+            await Navigator.push(
+              context,
+              SmoothPageRoute(page: const NewTeamsPage()),
+            );
+            _loadTeams();
+          },
+        ),
+        
+        const Divider(color: Colors.white24, height: 1),
+        
+        // History
+        ListTile(
+          leading: const Icon(Icons.history, color: Colors.white),
+          title: const Text('Match History', style: TextStyle(color: Colors.white)),
+          subtitle: Text(
+            'View past & paused matches',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+          ),
+          trailing: _buildMatchCountBadge(),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const HistoryPage()),
+            );
+          },
+        ),
+        
+        const Divider(color: Colors.white24, height: 1),
+        
+        // Statistics (Future feature)
+        ListTile(
+          leading: Icon(Icons.bar_chart, color: Colors.white.withOpacity(0.5)),
+          title: Text('Statistics', style: TextStyle(color: Colors.white.withOpacity(0.5))),
+          subtitle: Text(
+            'Coming soon',
+            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11),
+          ),
           onTap: () {
             Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Scorecard feature coming soon!'),
+                content: Text('Statistics feature coming soon!'),
                 backgroundColor: Color(0xFF00C4FF),
+                duration: Duration(seconds: 2),
               ),
             );
           },
+        ),
+        
+        const Divider(color: Colors.white24, height: 1),
+        
+        // Settings
+        ListTile(
+          leading: const Icon(Icons.settings, color: Colors.white),
+          title: const Text('Settings', style: TextStyle(color: Colors.white)),
+          subtitle: Text(
+            'App preferences',
+            style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
+          ),
+          onTap: () {
+            Navigator.pop(context);
+            _showSettingsDialog();
+          },
+        ),
+        
+        const Divider(color: Colors.white24, height: 1),
+        
+      
+        
+        const SizedBox(height: 20),
+        
+        // App Version at bottom
+        Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              const Divider(color: Colors.white24),
+              const SizedBox(height: 8),
+              Text(
+                'Cricket Scorer v1.0.0',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.4),
+                  fontSize: 11,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '© 2026 Turf Town',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.3),
+                  fontSize: 9,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+// Helper method to build match count badge
+Widget _buildMatchCountBadge() {
+  final allMatches = MatchHistory.getAll();
+  final count = allMatches.length;
+  
+  if (count == 0) return const SizedBox.shrink();
+  
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFF00C4FF),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Text(
+      count.toString(),
+      style: const TextStyle(
+        color: Colors.white,
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
+}
+
+// Settings Dialog
+void _showSettingsDialog() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF1C2026),
+      title: const Row(
+        children: [
+          Icon(Icons.settings, color: Color(0xFF00C4FF)),
+          SizedBox(width: 12),
+          Text('Settings', style: TextStyle(color: Colors.white)),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.notifications, color: Colors.white70),
+            title: const Text('Notifications', style: TextStyle(color: Colors.white)),
+            trailing: Switch(
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement notification toggle
+              },
+              activeColor: const Color(0xFF00C4FF),
+            ),
+            contentPadding: EdgeInsets.zero,
+          ),
+          const Divider(color: Colors.white24),
+          ListTile(
+            leading: const Icon(Icons.dark_mode, color: Colors.white70),
+            title: const Text('Dark Mode', style: TextStyle(color: Colors.white)),
+            trailing: Switch(
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement theme toggle
+              },
+              activeColor: const Color(0xFF00C4FF),
+            ),
+            contentPadding: EdgeInsets.zero,
+          ),
+          const Divider(color: Colors.white24),
+          ListTile(
+            leading: const Icon(Icons.vibration, color: Colors.white70),
+            title: const Text('Vibration', style: TextStyle(color: Colors.white)),
+            trailing: Switch(
+              value: true,
+              onChanged: (value) {
+                // TODO: Implement vibration toggle
+              },
+              activeColor: const Color(0xFF00C4FF),
+            ),
+            contentPadding: EdgeInsets.zero,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Close',
+            style: TextStyle(color: Color(0xFF00C4FF)),
+          ),
         ),
       ],
     ),
   );
 }
 
+// About Dialog
+void _showAboutDialog() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF1C2026),
+      title: const Row(
+        children: [
+          Icon(Icons.sports_cricket, color: Color(0xFF00C4FF), size: 28),
+          SizedBox(width: 12),
+          Text('About Cricket Scorer', style: TextStyle(color: Colors.white)),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Cricket Scorer',
+            style: TextStyle(
+              color: Color(0xFF00C4FF),
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Version 1.0.0',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'A comprehensive cricket scoring application to manage teams, track matches, and generate detailed scorecards.',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Divider(color: Colors.white24),
+          const SizedBox(height: 12),
+          _buildAboutRow(Icons.code, 'Developed by', 'Turf Town Team'),
+          const SizedBox(height: 8),
+          _buildAboutRow(Icons.calendar_today, 'Release Date', 'February 2026'),
+          const SizedBox(height: 8),
+          _buildAboutRow(Icons.email, 'Contact', 'support@turftown.com'),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text(
+            'Close',
+            style: TextStyle(color: Color(0xFF00C4FF)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Helper for About dialog rows
+Widget _buildAboutRow(IconData icon, String label, String value) {
+  return Row(
+    children: [
+      Icon(icon, color: const Color(0xFF00C4FF), size: 16),
+      const SizedBox(width: 8),
+      Text(
+        '$label: ',
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.7),
+          fontSize: 12,
+        ),
+      ),
+      Expanded(
+        child: Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    ],
+  );
+}
   Widget _buildBottomNavBar() {
     return Container(
       decoration: BoxDecoration(

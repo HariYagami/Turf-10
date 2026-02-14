@@ -91,211 +91,144 @@ class _TeamMembersPageState extends State<TeamMembersPage> {
   }
 
   void _showStoredPlayersDialog() {
-    final allPlayers = PlayerStorage.getPlayersByTeam(widget.team.teamId);
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1C2026),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Stored Players (${allPlayers.length})',
-              style: const TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Team ID: ${widget.team.teamId}',
-              style: const TextStyle(
-                color: Color(0xFF00C4FF),
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: allPlayers.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: Text(
-                    'No players stored for this team',
-                    style: TextStyle(color: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: allPlayers.length,
-                  itemBuilder: (context, index) {
-                    final player = allPlayers[index];
-                    final bool isValidTeam = player.teamId == widget.team.teamId;
-                    
-                    return Card(
-                      color: const Color(0xFF2A2F3A),
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 30,
-                                  height: 30,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF00C4FF).withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '${index + 1}',
-                                      style: const TextStyle(
-                                        color: Color(0xFF00C4FF),
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    player.teamName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                if (!isValidTeam)
-                                  const Icon(
-                                    Icons.warning_amber_rounded,
-                                    color: Colors.orange,
-                                    size: 20,
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.person,
-                                  size: 14,
-                                  color: Colors.white60,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Player ID: ${player.playerId}',
-                                  style: const TextStyle(
-                                    color: Colors.white60,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Icon(
-                                  isValidTeam ? Icons.check_circle : Icons.error,
-                                  size: 14,
-                                  color: isValidTeam ? Colors.green : Colors.orange,
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    'Team ID: ${player.teamId}',
-                                    style: TextStyle(
-                                      color: isValidTeam ? Colors.white60 : Colors.orange,
-                                      fontSize: 12,
-                                      fontWeight: isValidTeam ? FontWeight.normal : FontWeight.w600,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.storage,
-                                  size: 14,
-                                  color: Colors.white60,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'DB ID: ${player.id}',
-                                  style: const TextStyle(
-                                    color: Colors.white60,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            if (!isValidTeam)
-                              Container(
-                                margin: const EdgeInsets.only(top: 8),
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                    color: Colors.orange.withOpacity(0.5),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: Colors.orange,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                      child: Text(
-                                        'Team ID mismatch! This player belongs to a different team.',
-                                        style: TextStyle(
-                                          color: Colors.orange,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          if (allPlayers.isNotEmpty)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _showClearPlayersConfirmation();
-              },
-              child: const Text(
-                'Clear All',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+  final allPlayers = PlayerStorage.getPlayersByTeam(widget.team.teamId);
+  
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF1C2026),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Stored Players (${allPlayers.length})',
+            style: const TextStyle(color: Colors.white),
           ),
         ],
       ),
-    );
-  }
+      content: SizedBox(
+        width: double.maxFinite,
+        child: allPlayers.isEmpty
+            ? const Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text(
+                  'No players stored for this team',
+                  style: TextStyle(color: Colors.white70),
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : ListView.builder(
+                shrinkWrap: true,
+                itemCount: allPlayers.length,
+                itemBuilder: (context, index) {
+                  final player = allPlayers[index];
+                  final bool isValidTeam = player.teamId == widget.team.teamId;
+                  
+                  return Card(
+                    color: const Color(0xFF2A2F3A),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF00C4FF).withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    '${index + 1}',
+                                    style: const TextStyle(
+                                      color: Color(0xFF00C4FF),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  player.teamName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              if (!isValidTeam)
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Colors.orange,
+                                  size: 20,
+                                ),
+                            ],
+                          ),
+                          if (!isValidTeam)
+                            Container(
+                              margin: const EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.orange.withOpacity(0.5),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    color: Colors.orange,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Expanded(
+                                    child: Text(
+                                      'Team ID mismatch! This player belongs to a different team.',
+                                      style: TextStyle(
+                                        color: Colors.orange,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+      ),
+      actions: [
+        if (allPlayers.isNotEmpty)
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showClearPlayersConfirmation();
+            },
+            child: const Text(
+              'Clear All',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Close'),
+        ),
+      ],
+    ),
+  );
+}
 
   void _showClearPlayersConfirmation() {
     showDialog(
@@ -778,7 +711,7 @@ Future<void> _showMemberCountDialog() async {
     );
   }
 
-  Widget _buildPlayerField(int index) {
+ Widget _buildPlayerField(int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -821,7 +754,7 @@ Future<void> _showMemberCountDialog() async {
                 fontFamily: 'Poppins',
               ),
            decoration: InputDecoration(
-  hintText: '2-11 players',  // Changed to reflect minimum 2 players
+  hintText: 'Enter the player name',  // Changed from '2-11 players'
   hintStyle: const TextStyle(
     color: Color(0xFF9E9E9E),
     fontFamily: 'Poppins',
@@ -843,6 +776,7 @@ Future<void> _showMemberCountDialog() async {
       ),
     );
   }
+  
 
   Widget _buildSaveButton() {
     return Container(

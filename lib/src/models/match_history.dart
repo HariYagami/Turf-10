@@ -33,6 +33,13 @@ class MatchHistory {
   bool isPaused; // Track if match was paused/quit halfway
   String? pausedState; // JSON string storing complete match state when paused
 
+  // NEW FIELDS FOR MATCH TIMING
+  @Property(type: PropertyType.date)
+  DateTime? matchStartTime; // Track when match started
+
+  @Property(type: PropertyType.date)
+  DateTime? matchEndTime; // Track when match completed
+
   MatchHistory({
     this.id = 0,
     required this.matchId,
@@ -48,8 +55,10 @@ class MatchHistory {
     required this.team2Overs,
     required this.result,
     required this.isCompleted,
-    this.isPaused = false, // NEW: Default to false
-    this.pausedState, // NEW: Optional paused state
+    this.isPaused = false,
+    this.pausedState,
+    this.matchStartTime, // NEW
+    this.matchEndTime, // NEW
   });
 
   // Static methods for database operations
@@ -69,8 +78,10 @@ class MatchHistory {
     required double team2Overs,
     required String result,
     required bool isCompleted,
-    bool isPaused = false, // NEW: Optional parameter
-    String? pausedState, // NEW: Optional parameter
+    bool isPaused = false,
+    String? pausedState,
+    DateTime? matchStartTime, // NEW
+    DateTime? matchEndTime, // NEW
   }) {
     final matchHistory = MatchHistory(
       matchId: matchId,
@@ -86,8 +97,10 @@ class MatchHistory {
       team2Overs: team2Overs,
       result: result,
       isCompleted: isCompleted,
-      isPaused: isPaused, // NEW
-      pausedState: pausedState, // NEW
+      isPaused: isPaused,
+      pausedState: pausedState,
+      matchStartTime: matchStartTime, // NEW
+      matchEndTime: matchEndTime, // NEW
     );
 
     ObjectBoxHelper.matchHistoryBox.put(matchHistory);
@@ -164,6 +177,7 @@ class MatchHistory {
     isPaused = false;
     pausedState = null;
     result = finalResult;
+    matchEndTime = DateTime.now(); // NEW: Set end time
     save();
   }
 

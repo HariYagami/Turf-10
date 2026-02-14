@@ -121,10 +121,10 @@ class BleManagerService {
 
   Future<void> disconnect() async {
     debugPrint('🔌 BleManagerService: Disconnecting...');
-    
+
     _autoUpdateTimer?.cancel();
     _connectionSubscription?.cancel();
-    
+
     if (_connectedDevice != null) {
       try {
         await _connectedDevice!.disconnect();
@@ -132,12 +132,89 @@ class BleManagerService {
         debugPrint('⚠️ BleManagerService: Error during disconnect: $e');
       }
     }
-    
+
     _connectedDevice = null;
     _writeCharacteristic = null;
     _readCharacteristic = null;
-    
+
     _notifyStatus('Bluetooth disconnected', Colors.orange);
+  }
+
+  /// 🔥 NEW: Auto-reconnect to the last connected device
+  /// Used after match completion to reset and reconnect Bluetooth silently
+  Future<void> autoReconnect() async {
+    debugPrint('🔄 BleManagerService: Attempting auto-reconnect...');
+
+    // Can't reconnect without a previous device
+    if (_connectedDevice == null) {
+      debugPrint('⚠️ BleManagerService: No previous device to reconnect to');
+      return;
+    }
+
+    final deviceToReconnect = _connectedDevice!;
+
+    try {
+      // First, ensure completely disconnected
+      try {
+        await deviceToReconnect.disconnect();
+        await Future.delayed(const Duration(milliseconds: 300));
+      } catch (e) {
+        debugPrint('ℹ️ BleManagerService: Device already disconnected');
+      }
+
+      // Attempt reconnection
+      await deviceToReconnect.connect(
+        timeout: const Duration(seconds: 15),
+        autoConnect: false,
+      );
+
+      // Verify connection state
+      final connectionState = await deviceToReconnect.connectionState.first;
+      if (connectionState != BluetoothConnectionState.connected) {
+        throw Exception('Device not in connected state after reconnect');
+      }
+
+      _connectedDevice = deviceToReconnect;
+
+      // Discover services again
+      final services = await deviceToReconnect.discoverServices();
+      debugPrint('🔄 Services rediscovered: ${services.length}');
+
+      // Re-find characteristics
+      for (final service in services) {
+        for (final characteristic in service.characteristics) {
+          final charUuidStr = characteristic.uuid.toString().toUpperCase();
+
+          // Find write characteristic (1234)
+          if (charUuidStr.contains("1234")) {
+            if (characteristic.properties.write || characteristic.properties.writeWithoutResponse) {
+              _writeCharacteristic = characteristic;
+              debugPrint('✅ Write characteristic re-found');
+            }
+          }
+
+          // Find read characteristic (5678)
+          if (charUuidStr.contains("5678")) {
+            if (characteristic.properties.read || characteristic.properties.notify) {
+              _readCharacteristic = characteristic;
+              debugPrint('✅ Read characteristic re-found');
+            }
+          }
+        }
+      }
+
+      // Re-setup notifications if available
+      if (_readCharacteristic != null && _readCharacteristic!.properties.notify) {
+        await _setupReadNotifications();
+      }
+
+      debugPrint('✅ BleManagerService: Auto-reconnect successful');
+      _notifyStatus('Bluetooth reconnected', Colors.green);
+
+    } catch (e) {
+      debugPrint('❌ BleManagerService: Auto-reconnect failed: $e');
+      _handleDisconnection();
+    }
   }
 
   Future<bool> sendMatchUpdate() async {

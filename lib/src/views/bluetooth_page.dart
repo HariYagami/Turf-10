@@ -337,28 +337,29 @@ class _BluetoothPageState extends State<BluetoothPage>
   }
 }
 
-  Future<void> _disconnectDevice() async {
-    if (connectedDevice == null) return;
+Future<void> _disconnectDevice() async {
+  if (connectedDevice == null) return;
 
-    try {
-      _showSnackBar('Disconnecting...', Colors.orange);
-      
-      await BleManagerService().disconnect();
+  try {
+    _showSnackBar('Disconnecting...', Colors.orange);
+    
+    // 🔥 This is intentional disconnect from settings page
+    await BleManagerService().disconnect();
 
-      if (mounted) {
-        setState(() {
-          connectedDevice = null;
-          writeCharacteristic = null;
-          readCharacteristic = null;
-        });
-      }
-
-      _showSnackBar('Device disconnected', Colors.orange);
-    } catch (e) {
-      debugPrint('Error disconnecting device: $e');
-      _showSnackBar('Error disconnecting device', Colors.red);
+    if (mounted) {
+      setState(() {
+        connectedDevice = null;
+        writeCharacteristic = null;
+        readCharacteristic = null;
+      });
     }
+
+    _showSnackBar('Device disconnected', Colors.orange);
+  } catch (e) {
+    debugPrint('Error disconnecting device: $e');
+    _showSnackBar('Error disconnecting device', Colors.red);
   }
+}
 
   void _showSnackBar(String message, Color backgroundColor) {
     if (mounted) {

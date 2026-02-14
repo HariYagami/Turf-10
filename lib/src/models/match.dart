@@ -24,6 +24,10 @@ class Match {
   int wideFlag; // 0 = Wide allowed (true), 1 = Wide not allowed (false)
   int overs; // Number of overs for the match
   
+  // NEW: Track match start time
+  @Property(type: PropertyType.date)
+  DateTime? matchStartTime;
+  
   Match({
     this.id = 0,
     required this.matchId,
@@ -34,6 +38,7 @@ class Match {
     required this.noballFlag,
     required this.wideFlag,
     required this.overs,
+    this.matchStartTime, // NEW
   });
 
   // Static methods for database operations
@@ -92,6 +97,7 @@ class Match {
       noballFlag: noballFlag,
       wideFlag: wideFlag,
       overs: overs,
+      matchStartTime: DateTime.now(), // NEW: Set start time on creation
     );
     
     ObjectBoxHelper.matchBox.put(match);
@@ -249,18 +255,18 @@ class Match {
       // Determine winner and result message
       String result;
       if (secondScore.totalRuns >= secondInnings.targetRuns) {
-        // Team batting second won
+        // Team batting second (TeamB) met or exceeded target
         final team = Team.getById(secondInnings.battingTeamId);
-        final wicketsRemaining = 10 - secondScore.wickets;
+        int wicketsRemaining = 10 - secondScore.wickets;
         result = '${team?.teamName ?? "Team B"} won by $wicketsRemaining wickets';
       } else {
-        // Team batting first won
+        // Team batting first (TeamA) won - TeamB failed to chase
         final team = Team.getById(firstInnings.battingTeamId);
-        final runsDifference = firstScore.totalRuns - secondScore.totalRuns;
+        int runsDifference = secondInnings.targetRuns - secondScore.totalRuns;
         result = '${team?.teamName ?? "Team A"} won by $runsDifference runs';
       }
       
-      // Create match history entry
+      // Create match history entry with timing
       MatchHistory.create(
         matchId: matchId,
         teamAId: teamId1,
@@ -275,6 +281,8 @@ class Match {
         team2Overs: secondScore.overs,
         result: result,
         isCompleted: true,
+        matchStartTime: matchStartTime, // NEW: Pass match start time
+        matchEndTime: DateTime.now(), // NEW: Set end time
       );
       
       print('✅ Match saved to history successfully: $result');
@@ -393,6 +401,7 @@ class Match {
       'noballFlag': noballFlag,
       'wideFlag': wideFlag,
       'overs': overs,
+      'matchStartTime': matchStartTime?.toIso8601String(), // NEW
     };
   }
 }
