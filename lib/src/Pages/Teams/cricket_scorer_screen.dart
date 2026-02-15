@@ -292,44 +292,33 @@ Future<void> _initializeMatch() async {
     
     await _waitForBluetoothConnection();
     
-    // 🔥 CRITICAL: Extended delay for stable connection
-    await Future.delayed(const Duration(milliseconds: 2000));
+    // 🔥 REDUCED: From 2000ms to 800ms
+    await Future.delayed(const Duration(milliseconds: 800));
     
-    debugPrint('🧹 Clearing display before drawing layout (triple clear)...');
+    debugPrint('🧹 Clearing display before drawing layout (double clear)...');
     final bleService = BleManagerService();
     
     if (bleService.isConnected) {
-      // First clear
-      debugPrint('🧹 CLEAR 1/3');
+      // 🔥 REDUCED: Two clears instead of three, shorter delays
+      debugPrint('🧹 CLEAR 1/2');
       await bleService.sendRawCommands(['CLEAR']);
-      await Future.delayed(const Duration(milliseconds: 1000));
+      await Future.delayed(const Duration(milliseconds: 400));
       
-      // Second clear
-      debugPrint('🧹 CLEAR 2/3');
-      await bleService.sendRawCommands(['CLEAR']);
-      await Future.delayed(const Duration(milliseconds: 1000));
-      
-      // Third clear
-      debugPrint('🧹 CLEAR 3/3');
+      debugPrint('🧹 CLEAR 2/2');
       await bleService.sendRawCommands(['CLEAR']);
       
-      // 🔥 CRITICAL: MASSIVE delay to ensure display is completely blank and ready
-      // The LED needs time to:
-      // 1. Process all 3 CLEAR commands in queue
-      // 2. Clear internal framebuffer
-      // 3. Render blank screen
-      // 4. Return to idle state ready for new data
-      debugPrint('⏳ Waiting 4 seconds for display to fully stabilize...');
-      await Future.delayed(const Duration(seconds: 4));
+      // 🔥 REDUCED: From 4 seconds to 1.5 seconds
+      debugPrint('⏳ Waiting 1.5 seconds for display to stabilize...');
+      await Future.delayed(const Duration(milliseconds: 1500));
       
-      debugPrint('✅ Display cleared and fully stabilized - ready to draw');
+      debugPrint('✅ Display cleared and stabilized - ready to draw');
     } else {
       debugPrint('⚠️ BLE not connected - skipping clear');
     }
     
-    // 🔥 CRITICAL: Long delay before layout to ensure LED is in clean idle state
-    debugPrint('⏳ Waiting 1 second before sending layout...');
-    await Future.delayed(const Duration(milliseconds: 1000));
+    // 🔥 REDUCED: From 1000ms to 300ms
+    debugPrint('⏳ Waiting 300ms before sending layout...');
+    await Future.delayed(const Duration(milliseconds: 300));
     
     // Save match start time
     final existingHistory = MatchHistory.getByMatchId(widget.matchId);
@@ -338,7 +327,6 @@ Future<void> _initializeMatch() async {
       existingHistory.save();
     }  
     
-    // Draw appropriate layout
     debugPrint('🎨 Starting layout render...');
     if (isSecond) {
       await _sendSecondInningsIntroLayout();
@@ -444,9 +432,8 @@ Future<void> _sendFullLEDLayout() async {
     }
 
     debugPrint('🖥️ Drawing full LED layout...');
- 
 
-    // ── STEP 2: PREPARE ALL DATA ─────────────────────────────────────────
+    // ── PREPARE ALL DATA ─────────────────────────────────────────
     final battingTeam      = Team.getById(currentInnings!.battingTeamId);
     final bowlingTeam      = Team.getById(currentInnings!.bowlingTeamId);
     final strikerPlayer    = TeamMember.getByPlayerId(strikeBatsman!.playerId);
@@ -461,20 +448,6 @@ Future<void> _sendFullLEDLayout() async {
       final n = name ?? '';
       return (n.length > max ? n.substring(0, max) : n).toUpperCase();
     }
-    /// Calculates centered X position for text on the 128px wide LED display.
-/// charWidth: pixels per character (scale 1 = 6px, scale 2 = 12px, scale 3 = 18px)
-int _centerX(String text, int scale) {
-  const int displayWidth = 128;
-  final int textWidth = text.length * 6 * scale;
-  final int x = ((displayWidth - textWidth) / 2).round().clamp(0, displayWidth - 1);
-  return x;
-}
-
-/// Calculates X position so text ends at a given rightEdge pixel.
-int _rightAlignX(String text, int scale, int rightEdge) {
-  final int textWidth = text.length * 6 * scale;
-  return (rightEdge - textWidth).clamp(0, rightEdge);
-}
 
     final battingName    = trunc(battingTeam?.teamName,        6);
     final bowlingName    = trunc(bowlingTeam?.teamName,        6);
@@ -494,117 +467,125 @@ int _rightAlignX(String text, int scale, int rightEdge) {
     final bowlerRuns   = currentBowler!.runsConceded.toString();
     final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
 
-    // 🔥 FIX: Increased delay from 150ms to 250ms to prevent LED display overlaying
-    // The LED display needs adequate time to process and render each command batch
-    // before the next batch arrives. 150ms was too fast, causing cascading text overlap.
-    const int delayBetweenRows = 250;
+    // 🔥 100ms delay after EACH command
+    const int delayPerCommand = 100;
 
-   // ── ROW 1 (y=2): Header — time + org + temp ──────────────────────────
-await bleService.sendRawCommands([
-  'TEXT 3 2 1 255 255 200 $timeStr',
-  'TEXT 36 2 1 200 200 255 AEROBIOSYS',
-  'TEXT 102 2 1 200 255 200 ${temp}C',
-]);
-// 🔥 FIX: Increased from 250ms to 350ms for first row after long clear period
-await Future.delayed(const Duration(milliseconds: 350));
+    // ── ROW 1 (y=2): Header — time + org + temp ──────────────────────────
+    await bleService.sendRawCommands(['TEXT 3 2 1 255 255 200 $timeStr']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 36 2 1 200 200 255 AEROBIOSYS']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 102 2 1 200 255 200 ${temp}C']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-// ── ROW 2 (y=12+17): Divider + centered team names ───────────────────
-// Layout spec:
-// - Pixels 0-3 and 124-127: empty margins
-// - TeamA: pixels 3-54, centered at pixel 28
-// - Empty gap: pixels 54-57
-// - VS: pixels 57-69, centered within this range
-// - Empty gap: pixels 69-72
-// - TeamB: pixels 72-124, centered at pixel 98
+    // ── ROW 2 (y=12): Divider ───────────────────────────────────────────
+    await bleService.sendRawCommands(['LINE H 0 12 127 12 1 255 255 255']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-await bleService.sendRawCommands([
-  'LINE H 0 12 127 12 1 255 255 255',
-]);
-await Future.delayed(Duration(milliseconds: delayBetweenRows));
+    // ── ROW 2 (y=17): Team names ─────────────────────────────────────────
+    // Calculate team name widths (scale 1 = 6px per char)
+    final int batW = battingName.length * 6;
+    final int bowlW = bowlingName.length * 6;
 
-// Calculate team name widths (scale 1 = 6px per char)
-final int batW = battingName.length * 6;
-final int bowlW = bowlingName.length * 6;
+    // TeamA: center at pixel 28 (range 3-54)
+    final int batX = (28 - (batW ~/ 2)).clamp(3, 54 - batW);
 
-// TeamA: center at pixel 28 (range 3-54)
-final int batX = (28 - (batW ~/ 2)).clamp(3, 54 - batW);
+    // VS: center within pixels 57-69
+    const int vsX = 57;
 
-// VS: center within pixels 57-69 (12px wide range, "VS" = 12px)
-const int vsX = 57; // VS starts at 57, occupies 57-69
+    // TeamB: center at pixel 98 (range 72-124)
+    final int bowlX = (98 - (bowlW ~/ 2)).clamp(72, 124 - bowlW);
 
-// TeamB: center at pixel 98 (range 72-124)
-final int bowlX = (98 - (bowlW ~/ 2)).clamp(72, 124 - bowlW);
+    await bleService.sendRawCommands(['TEXT $batX 17 1 0 255 255 $battingName']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT $vsX 17 1 255 255 255 VS']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT $bowlX 17 1 255 100 100 $bowlingName']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-await bleService.sendRawCommands([
-  'TEXT $batX 17 1 0 255 255 $battingName',
-  'TEXT $vsX 17 1 255 255 255 VS',
-  'TEXT $bowlX 17 1 255 100 100 $bowlingName',
-]);
-await Future.delayed(Duration(milliseconds: delayBetweenRows));
+    // ── ROW 3 (y=30): Score ──────────────────────────────────────────────
+    const int scrLabelX = 17;
+    const int runsX = 67;
+    const int slashX = 100;
+    const int wicketsX = 112;
 
-// ── ROW 3 (y=30): Score - FIXED positions, LEFT-ALIGNED numbers ──────────
-// Layout: SCR:(runs)/(wickets) - all starting positions are FIXED
-// SCR: at x=17 (48px wide, scale 2)
-// Runs: always start at x=67 (LEFT-ALIGNED, max 3 digits = 36px, scale 2)
-// /: at x=100 (12px wide, scale 2, ends at 112)
-// Wickets: always start at x=112 (scale 2 for visibility, 12-24px wide)
+    await bleService.sendRawCommands(['TEXT $scrLabelX 30 2 255 0 255 SCR:']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT $runsX 30 2 255 255 255 $runs']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT $slashX 30 2 255 100 100 /']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT $wicketsX 30 2 255 255 255 $wickets']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-const int scrLabelX = 17;          // SCR: label
-const int runsX = 67;              // Runs ALWAYS start here (LEFT-ALIGNED)
-const int slashX = 100;            // / separator (moved left for better spacing)
-const int wicketsX = 112;          // Wickets start here (scale 2 for visibility)
-
-await bleService.sendRawCommands([
-  'TEXT $scrLabelX 30 2 255 0 255 SCR:',
-  'TEXT $runsX 30 2 255 255 255 $runs',
-  'TEXT $slashX 30 2 255 100 100 /',
-  'TEXT $wicketsX 30 2 255 255 255 $wickets',  // Scale 2 for better visibility
-]);
-await Future.delayed(Duration(milliseconds: delayBetweenRows));
-
-
-// ── ROW 4 (y=50): CRR + Overs ────────────────────────────────────────
-await bleService.sendRawCommands([
-  'TEXT 5 50 1 255 255 0 CRR:',
-  'TEXT 29 50 1 255 255 0 $crr',
-  'TEXT 66 50 1 0 255 0 OVR:',
-  'TEXT 90 50 1 0 255 0 $overs(${currentMatch!.overs})',
-]);
-await Future.delayed(const Duration(milliseconds: 150));
+    // ── ROW 4 (y=50): CRR + Overs ────────────────────────────────────────
+    await bleService.sendRawCommands(['TEXT 5 50 1 255 255 0 CRR:']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 29 50 1 255 255 0 $crr']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 66 50 1 0 255 0 OVR:']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 90 50 1 0 255 0 $overs(${currentMatch!.overs})']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
     // ── ROW 5 (y=60): Bowler ─────────────────────────────────────────────
-    await bleService.sendRawCommands([
-      'TEXT 10 60 1 255 200 200 $bowlerName',
-      'TEXT 58 60 1 0 255 0 $bowlerWkts',
-      'TEXT 64 60 1 0 255 0 /',
-      'TEXT 70 60 1 0 255 0 $bowlerRuns',
-      'TEXT 82 60 1 0 255 0 ($bowlerOvers)',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 150));
+    await bleService.sendRawCommands(['TEXT 10 60 1 255 200 200 $bowlerName']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 58 60 1 0 255 0 $bowlerWkts']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 64 60 1 0 255 0 /']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 70 60 1 0 255 0 $bowlerRuns']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 82 60 1 0 255 0 ($bowlerOvers)']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-    // ── ROW 6 (y=70+74+84): Divider + batsmen ────────────────────────────
-    await bleService.sendRawCommands([
-      'LINE H 0 70 127 70 1 255 255 255',
-      'TEXT 2 74 1 255 0 0 *',
-      'TEXT 8 74 1 200 255 255 $strikerName',
-      'TEXT 58 74 1 200 255 200 $strikerRuns($strikerBalls)',
-      'TEXT 8 84 1 200 200 255 $nonStrikerName',
-      'TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
-    ]);
+    // ── ROW 6 (y=70): Divider ───────────────────────────────────────────
+    await bleService.sendRawCommands(['LINE H 0 70 127 70 1 255 255 255']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-  debugPrint('✅ Full LED layout drawn');
+    // ── ROW 6 (y=74): Striker ───────────────────────────────────────────
+    await bleService.sendRawCommands(['TEXT 2 74 1 255 0 0 *']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 8 74 1 200 255 255 $strikerName']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 58 74 1 200 255 200 $strikerRuns($strikerBalls)']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+    // ── ROW 6 (y=84): Non-striker ───────────────────────────────────────
+    await bleService.sendRawCommands(['TEXT 8 84 1 200 200 255 $nonStrikerName']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+    
+    await bleService.sendRawCommands(['TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+    debugPrint('✅ Full LED layout drawn (25 commands with 100ms delays)');
     
     // 🔥 START PERIODIC TIME/TEMP UPDATE ONLY AFTER LAYOUT IS COMPLETELY READY
-    // CRITICAL: Only start timer once, check if already running
     if (_ledUpdateTimer == null || !_ledUpdateTimer!.isActive) {
-      // Wait 1 extra second to ensure layout is fully stable on LED
       await Future.delayed(const Duration(seconds: 1));
       
       _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
         debugPrint('⏰ CricketScorerScreen: Periodic LED update triggered');
         _updateLEDTimeAndTemp();
       });
-      debugPrint('🔄 Started periodic time/temp updates (60s interval) - LAYOUT FULLY COMPLETE');
+      debugPrint('🔄 Started periodic time/temp updates (60s interval)');
     }
 
   } catch (e) {
@@ -772,7 +753,8 @@ Future<void> _sendSecondInningsIntroLayout() async {
       'TEXT $targetGroupX 68 1 255 200 0 $targetLabel',
       'TEXT $targetNumX 68 1 255 255 0 $targetRuns',
     ]);
-    await Future.delayed(const Duration(milliseconds: 250));
+  
+await Future.delayed(const Duration(milliseconds: 100));
 
     // Row 7: "INNINGS 2 STARTING"
     const String startingText = 'INNINGS 2 STARTING...';
@@ -784,13 +766,13 @@ Future<void> _sendSecondInningsIntroLayout() async {
     debugPrint('✅ 1st innings summary shown. Waiting 3s...');
 
     // Hold summary for 3 seconds
-    await Future.delayed(const Duration(seconds: 3));
+   await Future.delayed(const Duration(seconds: 2));
 
     // ── PHASE 2: CLEAR + DRAW SECOND INNINGS LAYOUT ──────────────────────
     debugPrint('🖥️ Clearing and drawing 2nd innings layout...');
 
     await bleService.sendRawCommands(['CLEAR']);
-    await Future.delayed(const Duration(milliseconds: 800));
+    await Future.delayed(const Duration(milliseconds: 400));
 
     // Prepare second innings data
     final battingTeam      = Team.getById(currentInnings!.battingTeamId);
@@ -926,24 +908,24 @@ void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
   // Update existing history instead of creating new
   _updateMatchToHistory(battingTeamWon, firstInningsScore);
 
-  // 🔥 CLEAR LED DISPLAY IMMEDIATELY WHEN MATCH COMPLETES
-  Future.delayed(const Duration(milliseconds: 200), () {
-    _clearLEDDisplay();
+  // 🔥 CRITICAL: Wait longer before clearing to ensure all LED operations complete
+  // The score update takes time to fully transmit and render
+  Future.delayed(const Duration(milliseconds: 1000), () async {
+    debugPrint('🎯 Match complete - starting LED clear sequence...');
+    await _clearLEDDisplay();
+    debugPrint('✅ LED clear complete - connection preserved');
   });
 
-  // 🔥 FIX: Determine winner based on actual scores, not the parameter
+  // Rest of the dialog code remains the same...
   bool teamBWon = currentScore!.totalRuns >= currentInnings!.targetRuns;
 
-  // 🔥 ONLY SHOW SNACKBAR IF TEAM B WON (reached or exceeded target)
   if (teamBWon) {
-    // Get victory message from match history
     String victoryMessage = 'Match Complete!';
     final existingHistory = MatchHistory.getByMatchId(widget.matchId);
     if (existingHistory != null && existingHistory.result.isNotEmpty) {
       victoryMessage = existingHistory.result;
     }
 
-    // Show snackbar at top with victory message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -961,7 +943,6 @@ void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
       ),
     );
   } else {
-    // Team A won - also show snackbar
     String victoryMessage = 'Match Complete!';
     final existingHistory = MatchHistory.getByMatchId(widget.matchId);
     if (existingHistory != null && existingHistory.result.isNotEmpty) {
@@ -986,13 +967,10 @@ void _showVictoryDialog(bool battingTeamWon, Score firstInningsScore) {
     );
   }
 
-  // Auto-redirect to history page after 3 seconds
   Future.delayed(const Duration(seconds: 3), () {
     if (mounted) {
-      // 🔥 FIX: Pop CricketScorerScreen first before navigating
       Navigator.of(context).pop();
 
-      // Then navigate to Home
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
@@ -1015,33 +993,31 @@ Future<void> _clearLEDDisplay() async {
       return;
     }
 
+    // 🔥 CRITICAL: Wait for any ongoing LED operations to complete
+    debugPrint('⏳ Waiting for ongoing LED operations to complete...');
+    await Future.delayed(const Duration(milliseconds: 500));
+
     debugPrint('🧹 Clearing LED display (triple clear)...');
 
-    // First clear
+    // 🔥 FIRST CLEAR
     await bleService.sendRawCommands(['CLEAR']);
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Second clear (confirmation)
+    // 🔥 SECOND CLEAR
     await bleService.sendRawCommands(['CLEAR']);
     await Future.delayed(const Duration(milliseconds: 500));
 
-    // Third clear (guarantee complete blackout)
+    // 🔥 THIRD CLEAR
     await bleService.sendRawCommands(['CLEAR']);
-    await Future.delayed(const Duration(milliseconds: 300));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     debugPrint('✅ LED display cleared (triple clear complete)');
-
-    // 🔥 NEW: Auto-reconnect Bluetooth after clearing LED
-    // This silently reconnects in the background without user interaction
-    debugPrint('🔄 LED clear complete, initiating auto-reconnect...');
-    Future.delayed(const Duration(milliseconds: 500), () {
-      bleService.autoReconnect();
-    });
 
   } catch (e) {
     debugPrint('❌ LED clear failed: $e');
   }
 }
+
 
 
 void _saveMatchState() {
@@ -1056,27 +1032,23 @@ void _saveMatchState() {
       return;
     }
 
-    // Get all innings data
     final firstInnings = Innings.getFirstInnings(widget.matchId);
     final secondInnings = Innings.getSecondInnings(widget.matchId);
     final firstScore = firstInnings != null ? Score.getByInningsId(firstInnings.inningsId) : null;
     final secondScore = secondInnings != null ? Score.getByInningsId(secondInnings.inningsId) : null;
 
-    // Serialize match state to JSON
     final matchStateJson = jsonEncode({
       'matchId': widget.matchId,
       'inningsId': widget.inningsId,
       'strikeBatsmanId': widget.strikeBatsmanId,
       'nonStrikeBatsmanId': widget.nonStrikeBatsmanId,
       'bowlerId': widget.bowlerId,
-      // First innings data
       'firstInningsId': firstInnings?.inningsId,
       'firstInningsTeamId': firstInnings?.battingTeamId,
       'firstInningsRuns': firstScore?.totalRuns ?? 0,
       'firstInningsWickets': firstScore?.wickets ?? 0,
       'firstInningsOvers': firstScore?.overs ?? 0.0,
       'firstInningsExtras': firstScore?.totalExtras ?? 0,
-      // Second innings data
       'secondInningsId': secondInnings?.inningsId,
       'secondInningsTeamId': secondInnings?.battingTeamId,
       'secondInningsRuns': secondScore?.totalRuns ?? 0,
@@ -1084,23 +1056,22 @@ void _saveMatchState() {
       'secondInningsOvers': secondScore?.overs ?? 0.0,
       'secondInningsExtras': secondScore?.totalExtras ?? 0,
       'secondInningsTarget': secondInnings?.targetRuns ?? 0,
-      // Current match state
       'isCompleted': false,
       'timestamp': DateTime.now().toIso8601String(),
     });
 
-    // 🔥 FIXED: Clear LED but DON'T disconnect Bluetooth
-    _clearLEDDisplay();
-
-    // Give LED time to clear before saving and navigating
-    Future.delayed(const Duration(milliseconds: 600), () {
+    // 🔥 CRITICAL: Clear LED with proper delay, then save
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      await _clearLEDDisplay();
+      
+      // Wait for clear to complete before saving
+      await Future.delayed(const Duration(milliseconds: 500));
+      
       if (!mounted) return;
 
-      // Save to match history as paused match
       final existingHistory = MatchHistory.getByMatchId(widget.matchId);
 
       if (existingHistory != null) {
-        // Update existing paused match
         existingHistory.isPaused = true;
         existingHistory.pausedState = matchStateJson;
         existingHistory.result = 'Match Paused';
@@ -1114,7 +1085,6 @@ void _saveMatchState() {
         existingHistory.matchDate = DateTime.now();
         existingHistory.save();
       } else {
-        // Create new paused match history
         MatchHistory.create(
           matchId: widget.matchId,
           teamAId: currentMatch!.teamId1,
@@ -1141,7 +1111,6 @@ void _saveMatchState() {
         ),
       );
 
-      // Navigate back after saving
       Future.delayed(const Duration(milliseconds: 300), () {
         if (mounted) {
           Navigator.of(context).pop();
@@ -1163,6 +1132,7 @@ void _saveMatchState() {
     );
   }
 }
+
 
 
 void _updateMatchToHistory(bool battingTeamWon, Score firstInningsScore) {
@@ -1244,23 +1214,23 @@ void _updateMatchToHistory(bool battingTeamWon, Score firstInningsScore) {
 void _showMatchTiedDialog(Score firstInningsScore) {
   currentInnings?.markCompleted();
 
-  // Mark match as complete - freeze all buttons
   setState(() {
     isMatchComplete = true;
   });
 
-  // 🔥 CLEAR LED DISPLAY IMMEDIATELY WHEN MATCH TIED
-  Future.delayed(const Duration(milliseconds: 200), () {
-    _clearLEDDisplay();
+  // 🔥 CRITICAL: Wait longer before clearing
+  Future.delayed(const Duration(milliseconds: 1000), () async {
+    debugPrint('🎯 Match tied - starting LED clear sequence...');
+    await _clearLEDDisplay();
+    debugPrint('✅ LED clear complete - connection preserved');
   });
 
-  // Update match history
   _updateMatchTiedToHistory(firstInningsScore);
 
-  // Get team names
   final teamAName = Team.getById(currentInnings!.bowlingTeamId)?.teamName ?? "Team A";
   final teamBName = Team.getById(currentInnings!.battingTeamId)?.teamName ?? "Team B";
 
+  // Rest of the dialog code remains the same...
   showDialog(
     context: context,
     barrierDismissible: false,
@@ -1350,7 +1320,7 @@ void _showMatchTiedDialog(Score firstInningsScore) {
       actions: [
         TextButton(
           onPressed: () {
-            Navigator.of(context).pop(); // Close dialog
+            Navigator.of(context).pop();
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(
                 builder: (context) => const Home(),
@@ -1367,13 +1337,10 @@ void _showMatchTiedDialog(Score firstInningsScore) {
     ),
   );
 
-  // Auto-redirect to history page after 5 seconds
   Future.delayed(const Duration(seconds: 5), () {
     if (mounted) {
-      // 🔥 FIX: Pop CricketScorerScreen first before navigating
       Navigator.of(context).pop();
 
-      // Then navigate to Home
       Future.delayed(const Duration(milliseconds: 100), () {
         if (mounted) {
           Navigator.pushAndRemoveUntil(
@@ -1386,6 +1353,7 @@ void _showMatchTiedDialog(Score firstInningsScore) {
     }
   });
 }
+
 void _showLeaveMatchDialog() {
   // Dismiss blur overlay when back button is pressed
   setState(() {

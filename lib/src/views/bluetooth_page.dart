@@ -4,7 +4,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io';
 import 'dart:async';
-import 'dart:convert';
 import 'package:TURF_TOWN_/src/services/bluetooth_service.dart';
 
 class BluetoothPage extends StatefulWidget {
@@ -21,16 +20,15 @@ class _BluetoothPageState extends State<BluetoothPage>
   late Animation<double> _animation;
 
   List<ScanResult> scanResults = [];
-  BluetoothDevice? connectedDevice;
-  BluetoothCharacteristic? writeCharacteristic;
-  BluetoothCharacteristic? readCharacteristic;
 
   final String serviceUUID = "ABCD";
   final String characteristicUUID = "1234";
 
   StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
   StreamSubscription<List<ScanResult>>? _scanSubscription;
-  StreamSubscription<BluetoothConnectionState>? _connectionSubscription;
+  
+  // 🔥 NEW: Store connected device ID for highlighting
+  String? _connectedDeviceId;
 
   @override
   void initState() {
@@ -41,15 +39,26 @@ class _BluetoothPageState extends State<BluetoothPage>
     );
     _animation = Tween<double>(begin: 0, end: 1).animate(_animationController);
     _initBluetooth();
+    
+    // 🔥 NEW: Check if already connected on page load
+    _checkExistingConnection();
+  }
+  
+  // 🔥 NEW: Check for existing connection when page loads
+  void _checkExistingConnection() {
+    final bleService = BleManagerService();
+    if (bleService.isConnected && bleService.connectedDevice != null) {
+      setState(() {
+        _connectedDeviceId = bleService.connectedDevice!.remoteId.toString();
+      });
+    }
   }
 
   @override
   void dispose() {
     _animationController.dispose();
     _scanSubscription?.cancel();
-    _connectionSubscription?.cancel();
     _adapterStateSubscription?.cancel();
-    connectedDevice?.disconnect();
     super.dispose();
   }
 
@@ -106,6 +115,13 @@ class _BluetoothPageState extends State<BluetoothPage>
   }
 
   void startSearching() async {
+    // 🔥 NEW: Prevent scanning if already connected
+    final bleService = BleManagerService();
+    if (bleService.isConnected) {
+      _showSnackBar('Already connected. Disconnect first to scan again.', Colors.orange);
+      return;
+    }
+    
     await _requestPermissions();
 
     if (Platform.isAndroid) {
@@ -173,193 +189,178 @@ class _BluetoothPageState extends State<BluetoothPage>
     }
   }
 
- Future<void> _connectToDevice(BluetoothDevice device) async {
-  try {
-    _showSnackBar('Connecting to ${device.platformName}...', Colors.blue);
-
-    // Cancel any existing connection attempts
+  Future<void> _connectToDevice(BluetoothDevice device) async {
+    // 🔥 NEW: Prevent connecting to other devices if already connected
+    final bleService = BleManagerService();
+    if (bleService.isConnected) {
+      _showSnackBar('Already connected to a device. Disconnect first.', Colors.orange);
+      return;
+    }
+    
     try {
-      await device.disconnect();
+      _showSnackBar('Connecting to ${device.platformName}...', Colors.blue);
+
+      // Cancel any existing connection attempts
+      try {
+        await device.disconnect();
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (e) {
+        debugPrint('No previous connection to cancel');
+      }
+
+      // Attempt connection with proper timeout and auto-connect disabled
+      await device.connect(
+        timeout: const Duration(seconds: 15),
+        autoConnect: false,
+      );
+
+      // Verify connection state before proceeding
+      final connectionState = await device.connectionState.first;
+      if (connectionState != BluetoothConnectionState.connected) {
+        throw Exception('Device not in connected state');
+      }
+
+      _showSnackBar('Connected! Discovering services...', Colors.green);
+
+      // Request MTU increase
+      try {
+        await device.requestMtu(512);
+        debugPrint('✅ MTU increased to 512');
+      } catch (e) {
+        debugPrint('⚠️ Could not increase MTU: $e');
+      }
+
+      // Small delay before service discovery
       await Future.delayed(const Duration(milliseconds: 500));
-    } catch (e) {
-      debugPrint('No previous connection to cancel');
-    }
 
-    // Attempt connection with proper timeout and auto-connect disabled
-    await device.connect(
-      timeout: const Duration(seconds: 15),
-      autoConnect: false, // Critical fix for Android
-    );
+      // Discover services
+      List<BluetoothService> services = await device.discoverServices();
+      debugPrint('Found ${services.length} services');
 
-    // Verify connection state before proceeding
-    final connectionState = await device.connectionState.first;
-    if (connectionState != BluetoothConnectionState.connected) {
-      throw Exception('Device not in connected state');
-    }
+      bool serviceFound = false;
 
-    setState(() {
-      connectedDevice = device;
-    });
+      for (BluetoothService service in services) {
+        debugPrint('Service UUID: ${service.uuid}');
 
-    // ✅ FIXED: Removed duplicate connection listener
-    // BleManagerService.initialize() already sets up connection state listening
-    // Having two listeners on same stream causes immediate disconnect
+        if (service.uuid.toString().toUpperCase().contains(serviceUUID.toUpperCase())) {
+          serviceFound = true;
+          debugPrint('✅ Target service found!');
 
-    _showSnackBar('Connected! Discovering services...', Colors.green);
+          BluetoothCharacteristic? foundWriteCharacteristic;
+          BluetoothCharacteristic? foundReadCharacteristic;
 
-    // Request MTU increase
-    try {
-      await device.requestMtu(512);
-      debugPrint('✅ MTU increased to 512');
-    } catch (e) {
-      debugPrint('⚠️ Could not increase MTU: $e');
-    }
+          for (BluetoothCharacteristic characteristic in service.characteristics) {
+            debugPrint('Characteristic UUID: ${characteristic.uuid}');
+            final charUuidStr = characteristic.uuid.toString().toUpperCase();
 
-    // Small delay before service discovery
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    // Discover services
-    List<BluetoothService> services = await device.discoverServices();
-    debugPrint('Found ${services.length} services');
-
-    bool serviceFound = false;
-
-    for (BluetoothService service in services) {
-      debugPrint('Service UUID: ${service.uuid}');
-
-      // Match service UUID (case-insensitive)
-      if (service.uuid.toString().toUpperCase().contains(serviceUUID.toUpperCase())) {
-        serviceFound = true;
-        debugPrint('✅ Target service found!');
-
-        for (BluetoothCharacteristic characteristic in service.characteristics) {
-          debugPrint('Characteristic UUID: ${characteristic.uuid}');
-          final charUuidStr = characteristic.uuid.toString().toUpperCase();
-
-          // Find write characteristic
-          if (charUuidStr.contains("1234")) {
-            if (characteristic.properties.write ||
-                characteristic.properties.writeWithoutResponse) {
-              setState(() {
-                writeCharacteristic = characteristic;
-              });
-              debugPrint('✅ Write characteristic found');
-            }
-          }
-
-          // Find read/notify characteristic
-          if (charUuidStr.contains("5678")) {
-            if (characteristic.properties.read ||
-                characteristic.properties.notify) {
-              setState(() {
-                readCharacteristic = characteristic;
-              });
-              debugPrint('✅ Read characteristic found');
-            }
-          }
-        }
-
-        if (writeCharacteristic != null) {
-          debugPrint('╔════════════════════════════════════════╗');
-          debugPrint('║  ✅ BLUETOOTH CONNECTION SUCCESSFUL ✅  ║');
-          debugPrint('╠════════════════════════════════════════╣');
-          debugPrint('║  Device: ${device.platformName.padRight(28)}║');
-          debugPrint('║  Status: Ready to receive commands     ║');
-          debugPrint('╚════════════════════════════════════════╝');
-
-          _showSnackBar('✅ Connected! Ready to send data', Colors.green);
-
-          // Initialize BLE Manager Service
-          BleManagerService().initialize(
-            device: device,
-            writeCharacteristic: writeCharacteristic!,
-            readCharacteristic: readCharacteristic,
-            statusCallback: _showSnackBar,
-            disconnectCallback: () {
-              if (mounted) {
-                setState(() {
-                  connectedDevice = null;
-                  writeCharacteristic = null;
-                  readCharacteristic = null;
-                });
+            if (charUuidStr.contains("1234")) {
+              if (characteristic.properties.write ||
+                  characteristic.properties.writeWithoutResponse) {
+                foundWriteCharacteristic = characteristic;
+                debugPrint('✅ Write characteristic found');
               }
-            },
-          );
+            }
 
-          return;
-        } else {
-          throw Exception('Write characteristic not found in service');
+            if (charUuidStr.contains("5678")) {
+              if (characteristic.properties.read ||
+                  characteristic.properties.notify) {
+                foundReadCharacteristic = characteristic;
+                debugPrint('✅ Read characteristic found');
+              }
+            }
+          }
+
+          if (foundWriteCharacteristic != null) {
+            debugPrint('╔════════════════════════════════════════╗');
+            debugPrint('║  ✅ BLUETOOTH CONNECTION SUCCESSFUL ✅  ║');
+            debugPrint('╠════════════════════════════════════════╣');
+            debugPrint('║  Device: ${device.platformName.padRight(28)}║');
+            debugPrint('║  Status: Ready to receive commands     ║');
+            debugPrint('╚════════════════════════════════════════╝');
+
+            _showSnackBar('✅ Connected! Ready to send data', Colors.green);
+
+            // 🔥 NEW: Store connected device ID for UI highlighting
+            setState(() {
+              _connectedDeviceId = device.remoteId.toString();
+            });
+
+            BleManagerService().initialize(
+              device: device,
+              writeCharacteristic: foundWriteCharacteristic,
+              readCharacteristic: foundReadCharacteristic,
+              statusCallback: _showSnackBar,
+              disconnectCallback: () {
+                if (mounted) {
+                  setState(() {
+                    // 🔥 NEW: Clear highlighted device on disconnect
+                    _connectedDeviceId = null;
+                  });
+                }
+              },
+            );
+
+            return;
+          } else {
+            throw Exception('Write characteristic not found in service');
+          }
         }
       }
-    }
 
-    if (!serviceFound) {
-      throw Exception('Service UUID $serviceUUID not found on device');
-    }
+      if (!serviceFound) {
+        throw Exception('Service UUID $serviceUUID not found on device');
+      }
 
-  } on TimeoutException {
-    debugPrint('❌ Connection timeout');
-    _showSnackBar('Connection timeout - device not responding', Colors.red);
-    
-    if (mounted) {
-      setState(() {
-        connectedDevice = null;
-        writeCharacteristic = null;
-        readCharacteristic = null;
-      });
-    }
-  } catch (e) {
-    debugPrint('❌ Error connecting to device: $e');
-    
-    String errorMessage = 'Connection failed';
-    if (e.toString().contains('133')) {
-      errorMessage = 'Connection error - try resetting Bluetooth';
-    } else if (e.toString().contains('62')) {
-      errorMessage = 'Device not accepting connections - check ESP32';
-    } else if (e.toString().contains('Service')) {
-      errorMessage = 'Service not found - check ESP32 firmware';
-    }
-    
-    _showSnackBar(errorMessage, Colors.red);
+    } on TimeoutException {
+      debugPrint('❌ Connection timeout');
+      _showSnackBar('Connection timeout - device not responding', Colors.red);
 
-    // Clean disconnect on error
+      try {
+        await device.disconnect();
+      } catch (_) {}
+    } catch (e) {
+      debugPrint('❌ Error connecting to device: $e');
+
+      String errorMessage = 'Connection failed';
+      if (e.toString().contains('133')) {
+        errorMessage = 'Connection error - try resetting Bluetooth';
+      } else if (e.toString().contains('62')) {
+        errorMessage = 'Device not accepting connections - check ESP32';
+      } else if (e.toString().contains('Service')) {
+        errorMessage = 'Service not found - check ESP32 firmware';
+      }
+
+      _showSnackBar(errorMessage, Colors.red);
+
+      try {
+        await device.disconnect();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _disconnectDevice() async {
+    final bleService = BleManagerService();
+
+    if (!bleService.isConnected) return;
+
     try {
-      await device.disconnect();
-    } catch (_) {}
+      _showSnackBar('Disconnecting...', Colors.orange);
 
-    if (mounted) {
-      setState(() {
-        connectedDevice = null;
-        writeCharacteristic = null;
-        readCharacteristic = null;
-      });
+      await bleService.disconnect();
+
+      if (mounted) {
+        setState(() {
+          // 🔥 NEW: Clear connected device ID on manual disconnect
+          _connectedDeviceId = null;
+        });
+      }
+
+      _showSnackBar('Device disconnected', Colors.orange);
+    } catch (e) {
+      debugPrint('Error disconnecting device: $e');
+      _showSnackBar('Error disconnecting device', Colors.red);
     }
   }
-}
-
-Future<void> _disconnectDevice() async {
-  if (connectedDevice == null) return;
-
-  try {
-    _showSnackBar('Disconnecting...', Colors.orange);
-    
-    // 🔥 This is intentional disconnect from settings page
-    await BleManagerService().disconnect();
-
-    if (mounted) {
-      setState(() {
-        connectedDevice = null;
-        writeCharacteristic = null;
-        readCharacteristic = null;
-      });
-    }
-
-    _showSnackBar('Device disconnected', Colors.orange);
-  } catch (e) {
-    debugPrint('Error disconnecting device: $e');
-    _showSnackBar('Error disconnecting device', Colors.red);
-  }
-}
 
   void _showSnackBar(String message, Color backgroundColor) {
     if (mounted) {
@@ -388,6 +389,10 @@ Future<void> _disconnectDevice() async {
 
   @override
   Widget build(BuildContext context) {
+    final bleService = BleManagerService();
+    final isConnected = bleService.isConnected;
+    final deviceName = bleService.deviceName;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -454,23 +459,23 @@ Future<void> _disconnectDevice() async {
                         ),
                       )
                     : Icon(
-                        connectedDevice == null
-                            ? Icons.bluetooth_disabled
-                            : Icons.bluetooth_connected,
+                        isConnected
+                            ? Icons.bluetooth_connected
+                            : Icons.bluetooth_disabled,
                         size: 100,
-                        color: connectedDevice == null
-                            ? Colors.grey
-                            : Colors.greenAccent,
+                        color: isConnected
+                            ? Colors.greenAccent
+                            : Colors.grey,
                       ),
               ),
               Text(
-                connectedDevice == null
-                    ? (isSearching ? 'Searching...' : 'Not Connected')
-                    : 'Connected to ${connectedDevice!.platformName}',
+                isConnected
+                    ? 'Connected to $deviceName'
+                    : (isSearching ? 'Searching...' : 'Not Connected'),
                 style: TextStyle(
-                  color: connectedDevice == null
-                      ? Colors.white70
-                      : Colors.greenAccent,
+                  color: isConnected
+                      ? Colors.greenAccent
+                      : Colors.white70,
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
                 ),
@@ -479,13 +484,13 @@ Future<void> _disconnectDevice() async {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: ElevatedButton(
-                  onPressed: connectedDevice == null
-                      ? (isSearching ? null : startSearching)
-                      : _disconnectDevice,
+                  onPressed: isConnected
+                      ? _disconnectDevice
+                      : (isSearching ? null : startSearching),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: connectedDevice == null
-                        ? Colors.blueAccent
-                        : Colors.redAccent,
+                    backgroundColor: isConnected
+                        ? Colors.redAccent
+                        : Colors.blueAccent,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -493,9 +498,9 @@ Future<void> _disconnectDevice() async {
                     minimumSize: const Size(double.infinity, 50),
                   ),
                   child: Text(
-                    connectedDevice == null
-                        ? (isSearching ? 'Searching...' : 'Start Scanning')
-                        : 'Disconnect',
+                    isConnected
+                        ? 'Disconnect'
+                        : (isSearching ? 'Searching...' : 'Start Scanning'),
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -523,63 +528,122 @@ Future<void> _disconnectDevice() async {
                           final deviceName = device.platformName.isEmpty
                               ? 'Unknown Device'
                               : device.platformName;
+                          
+                          // 🔥 NEW: Check if this device is currently connected
+                          final isThisDeviceConnected = _connectedDeviceId == device.remoteId.toString();
 
                           return Card(
-                            color: const Color(0xFF1E1E2E),
+                            color: isThisDeviceConnected 
+                                ? const Color(0xFF2E4E3E) // 🔥 NEW: Green tint for connected device
+                                : const Color(0xFF1E1E2E),
                             margin: const EdgeInsets.only(bottom: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
+                              // 🔥 NEW: Green border for connected device
+                              side: isThisDeviceConnected
+                                  ? const BorderSide(color: Colors.greenAccent, width: 2)
+                                  : BorderSide.none,
                             ),
                             child: ListTile(
                               leading: Icon(
-                                _getDeviceIcon(deviceName),
-                                color: Colors.blueAccent,
-size: 36,
-),
-title: Text(
-deviceName,
-style: const TextStyle(
-color: Colors.white,
-fontSize: 16,
-fontWeight: FontWeight.w600,
-),
-),
-subtitle: Text(
-device.remoteId.toString(),
-style: const TextStyle(
-color: Colors.white54,
-fontSize: 12,
-),
-),
-trailing: result.rssi != 0
-? Container(
-padding: const EdgeInsets.symmetric(
-horizontal: 8,
-vertical: 4,
-),
-decoration: BoxDecoration(
-color: Colors.blueAccent.withOpacity(0.2),
-borderRadius: BorderRadius.circular(8),
-),
-child: Text(
-'${result.rssi} dBm',
-style: const TextStyle(
-color: Colors.blueAccent,
-fontSize: 12,
-),
-),
-)
-: null,
-onTap: () => _connectToDevice(device),
-),
-);
-},
-),
-),
-],
-),
-),
-),
-);
-}
+                                isThisDeviceConnected
+                                    ? Icons.bluetooth_connected // 🔥 NEW: Connected icon
+                                    : _getDeviceIcon(deviceName),
+                                color: isThisDeviceConnected
+                                    ? Colors.greenAccent // 🔥 NEW: Green for connected
+                                    : Colors.blueAccent,
+                                size: 36,
+                              ),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      deviceName,
+                                      style: TextStyle(
+                                        color: isThisDeviceConnected
+                                            ? Colors.greenAccent // 🔥 NEW: Green text for connected
+                                            : Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  // 🔥 NEW: "CONNECTED" badge
+                                  if (isThisDeviceConnected)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.greenAccent.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.greenAccent,
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'CONNECTED',
+                                        style: TextStyle(
+                                          color: Colors.greenAccent,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              subtitle: Text(
+                                device.remoteId.toString(),
+                                style: TextStyle(
+                                  color: isThisDeviceConnected
+                                      ? Colors.greenAccent.withOpacity(0.7) // 🔥 NEW: Green subtitle
+                                      : Colors.white54,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: result.rssi != 0
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isThisDeviceConnected
+                                            ? Colors.greenAccent.withOpacity(0.2) // 🔥 NEW: Green RSSI badge
+                                            : Colors.blueAccent.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '${result.rssi} dBm',
+                                        style: TextStyle(
+                                          color: isThisDeviceConnected
+                                              ? Colors.greenAccent // 🔥 NEW: Green RSSI text
+                                              : Colors.blueAccent,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                              // 🔥 NEW: Disable tap if already connected (unless it's this device)
+                              onTap: isConnected && !isThisDeviceConnected
+                                  ? () {
+                                      _showSnackBar(
+                                        'Already connected. Disconnect first.',
+                                        Colors.orange,
+                                      );
+                                    }
+                                  : () => _connectToDevice(device),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

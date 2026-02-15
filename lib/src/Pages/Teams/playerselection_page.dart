@@ -463,16 +463,16 @@ Future<void> _sendInitialLEDData({
     // ── STEP 1: TRIPLE CLEAR FOR COMPLETE BLACKOUT ──────────────────────────
     debugPrint('📍 Step 1: Clearing display (triple clear)...');
     await bleService.sendRawCommands(['CLEAR']);
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 100));
     
-    await bleService.sendRawCommands(['CLEAR']);
-    await Future.delayed(const Duration(milliseconds: 500));
+    // await bleService.sendRawCommands(['CLEAR']);
+    // await Future.delayed(const Duration(milliseconds: 500));
     
-    await bleService.sendRawCommands(['CLEAR']);
+    // await bleService.sendRawCommands(['CLEAR']);
     
     // ── STEP 2: EXTENDED PAUSE FOR ESP32 TO FULLY PROCESS ───────────────────
-    debugPrint('📍 Step 2: Waiting 1500ms for display to stabilize...');
-    await Future.delayed(const Duration(milliseconds: 1500));
+    // debugPrint('📍 Step 2: Waiting 1500ms for display to stabilize...');
+    // await Future.delayed(const Duration(milliseconds: 1500));
 
     // ── STEP 3: PREPARE DATA ─────────────────────────────────────────────────
     debugPrint('📍 Step 3: Preparing player/team data...');
@@ -499,62 +499,63 @@ Future<void> _sendInitialLEDData({
     debugPrint('   Time: $timeStr | Temp: ${temp}°C');
 
     // ── STEP 4-8: DRAW LAYOUT WITH PROPER DELAYS ─────────────────────────────
-    debugPrint('📍 Step 4: Drawing header...');
-    await bleService.sendRawCommands([
-      'TEXT 3 2 1 255 255 200 $timeStr',
-      'TEXT 36 2 1 200 200 255 AEROBIOSYS',
-      'TEXT 102 2 1 200 255 200 ${temp}C',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 300));
+    // debugPrint('📍 Step 4: Drawing header...');
+    // await bleService.sendRawCommands([
+    //   'TEXT 3 2 1 255 255 200 $timeStr',
 
-    debugPrint('📍 Step 5: Drawing team name...');
-    await bleService.sendRawCommands([
-      'LINE H 0 12 127 12 1 255 255 255',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 250));
+    //   'TEXT 36 2 1 200 200 255 AEROBIOSYS',
+    //   'TEXT 102 2 1 200 255 200 ${temp}C',
+    // ]);
+    // await Future.delayed(const Duration(milliseconds: 300));
+
+    // debugPrint('📍 Step 5: Drawing team name...');
+    // await bleService.sendRawCommands([
+    //   'LINE H 0 12 127 12 1 255 255 255',
+    // ]);
+    // await Future.delayed(const Duration(milliseconds: 250));
     
-    await bleService.sendRawCommands([
-      'TEXT 15 17 1 0 255 255 $teamName',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 300));
+    // await bleService.sendRawCommands([
+    //   'TEXT 15 17 1 0 255 255 $teamName',
+    // ]);
+    // await Future.delayed(const Duration(milliseconds: 300));
 
-    debugPrint('📍 Step 6: Drawing score area...');
-    await bleService.sendRawCommands([
-      'TEXT 17 30 2 255 0 255 SCR:',
-      'TEXT 67 30 2 255 255 255 0',
-      'TEXT 100 30 2 255 100 100 /',
-      'TEXT 112 30 2 255 255 255 0',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 300));
+    // debugPrint('📍 Step 6: Drawing score area...');
+    // await bleService.sendRawCommands([
+    //   'TEXT 17 30 2 255 0 255 SCR:',
+    //   'TEXT 67 30 2 255 255 255 0',
+    //   'TEXT 100 30 2 255 100 100 /',
+    //   'TEXT 112 30 2 255 255 255 0',
+    // ]);
+    // await Future.delayed(const Duration(milliseconds: 300));
 
-    debugPrint('📍 Step 7: Drawing CRR and overs...');
-    await bleService.sendRawCommands([
-      'TEXT 5 50 1 255 255 0 CRR:',
-      'TEXT 29 50 1 255 255 0 0.00',
-      'TEXT 70 50 1 0 255 0 OVR:',
-      'TEXT 94 50 1 0 255 0 0.0',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 300));
+    // debugPrint('📍 Step 7: Drawing CRR and overs...');
+    // await bleService.sendRawCommands([
+    //   'TEXT 5 50 1 255 255 0 CRR:',
+    //   'TEXT 29 50 1 255 255 0 0.00',
+    //   'TEXT 70 50 1 0 255 0 OVR:',
+    //   'TEXT 94 50 1 0 255 0 0.0',
+    // ]);
+    // await Future.delayed(const Duration(milliseconds: 300));
 
-    debugPrint('📍 Step 8: Drawing bowler...');
-    await bleService.sendRawCommands([
-      'TEXT 10 60 1 255 200 200 $bowlerName',
-      'TEXT 58 60 1 0 255 0 0',
-      'TEXT 64 60 1 0 255 0 /',
-      'TEXT 70 60 1 0 255 0 0',
-      'TEXT 82 60 1 0 255 0 (0.0)',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 300));
+    // debugPrint('📍 Step 8: Drawing bowler...');
+    // await bleService.sendRawCommands([
+    //   'TEXT 10 60 1 255 200 200 $bowlerName',
+    //   'TEXT 58 60 1 0 255 0 0',
+    //   'TEXT 64 60 1 0 255 0 /',
+    //   'TEXT 70 60 1 0 255 0 0',
+    //   'TEXT 82 60 1 0 255 0 (0.0)',
+    // ]);
+    // await Future.delayed(const Duration(milliseconds: 300));
 
-    debugPrint('📍 Step 9: Drawing batsmen...');
-    await bleService.sendRawCommands([
-      'LINE H 0 70 127 70 1 255 255 255',
-      'TEXT 2 74 1 255 0 0 *',
-      'TEXT 8 74 1 200 255 255 $strikerName',
-      'TEXT 58 74 1 200 255 200 0(0)',
-      'TEXT 8 84 1 200 200 255 $nonStrikerName',
-      'TEXT 58 84 1 200 255 200 0(0)',
-    ]);
+    // debugPrint('📍 Step 9: Drawing batsmen...');
+    // await bleService.sendRawCommands([
+    //   'LINE H 0 70 127 70 1 255 255 255',
+    //   'TEXT 2 74 1 255 0 0 *',
+    //   'TEXT 8 74 1 200 255 255 $strikerName',
+    //   'TEXT 58 74 1 200 255 200 0(0)',
+    //   'TEXT 8 84 1 200 200 255 $nonStrikerName',
+    //   'TEXT 58 84 1 200 255 200 0(0)',
+    // ]);
 
     debugPrint('╔════════════════════════════════════════╗');
     debugPrint('║  ✅ LED DISPLAY INITIALISED OK         ║');

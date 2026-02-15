@@ -54,15 +54,24 @@ class BleManagerService {
     onStatusUpdate = statusCallback;
     onDisconnected = disconnectCallback;
 
-    // ✅ FIXED: Removed duplicate connection listener
-    // Only bluetooth_page.dart monitors connection state
-    // Multiple listeners cause immediate disconnect on connection
-    
-    if (_readCharacteristic != null && 
+    // 🔥 NEW: Listen to device connection state changes for persistent connection tracking
+    // This ensures the UI always reflects the actual device connection state
+    _connectionSubscription = device.connectionState.listen((state) {
+      debugPrint('🔗 BleManagerService: Connection state changed to $state');
+
+      if (state == BluetoothConnectionState.disconnected) {
+        _handleDisconnection();
+        onDisconnected?.call();
+      } else if (state == BluetoothConnectionState.connected) {
+        _notifyStatus('Bluetooth connected', Colors.green);
+      }
+    });
+
+    if (_readCharacteristic != null &&
         _readCharacteristic!.properties.notify) {
       _setupReadNotifications();
     }
-    
+
     debugPrint('✅ BleManagerService: Initialized with ${device.platformName}');
     _notifyStatus('Bluetooth service ready', Colors.green);
   }
