@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+<<<<<<< HEAD
 import 'package:TURF_TOWN_/src/Screens/account.dart';
+=======
+import 'package:TURF_TOWN_/src/Menus/account.dart';
+>>>>>>> recovered-20260202
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});

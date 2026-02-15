@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/CommonParameters/AppBackGround1/Appbg1.dart';
+<<<<<<< HEAD
 import 'package:TURF_TOWN_/src/CommonParameters/Validators.dart';
+=======
+>>>>>>> recovered-20260202
 import 'package:TURF_TOWN_/src/services/Otp.dart';
 
 class PhoneNumberPage extends StatefulWidget {
@@ -14,6 +17,7 @@ class _PhoneNumberPageState extends State<PhoneNumberPage> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
   bool _isAgreed = false;
+<<<<<<< HEAD
   bool _isPhoneValid = false;
 
   void _validatePhone() {
@@ -21,11 +25,16 @@ class _PhoneNumberPageState extends State<PhoneNumberPage> {
       _isPhoneValid = _formKey.currentState?.validate() ?? false;
     });
   }
+=======
+>>>>>>> recovered-20260202
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+<<<<<<< HEAD
       resizeToAvoidBottomInset: false,
+=======
+>>>>>>> recovered-20260202
       body: Stack(
         children: [
           Container(
@@ -35,6 +44,7 @@ class _PhoneNumberPageState extends State<PhoneNumberPage> {
             ),
           ),
           Positioned(
+<<<<<<< HEAD
             top: 200,
             left: 0,
             right: 0,
@@ -46,12 +56,24 @@ class _PhoneNumberPageState extends State<PhoneNumberPage> {
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
                 height: 1.3,
+=======
+            top: 230,
+            left: 100,
+            child: Text(
+              'Enter your Phone \nNumber',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 24,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+>>>>>>> recovered-20260202
               ),
             ),
           ),
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 50),
+<<<<<<< HEAD
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -241,15 +263,141 @@ class _PhoneNumberPageState extends State<PhoneNumberPage> {
                         Icons.arrow_forward,
                         color: Colors.white,
                         size: 28,
+=======
+              child: Form(
+                key: _formKey,
+                child: TextFormField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    floatingLabelBehavior: FloatingLabelBehavior.never,
+                    labelText: 'Phone Number',
+                    prefixText: '+91 ',
+                    filled: true,
+                    fillColor: Color(0xFFC6C3C3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  validator: (value) {
+                    return null;
+                  },
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 140,
+            left: 30,
+            right: 30,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Transform.scale(
+                  scale: 1.2,
+                  child: Checkbox(
+                    value: _isAgreed,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isAgreed = value ?? false;
+                      });
+                    },
+                    activeColor: Colors.white,
+                    checkColor: Color(0xFF0094FF),
+                  ),
+                ),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      'By entering your number, you\'re agreeing to our Terms of service & Privacy Policy',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+>>>>>>> recovered-20260202
                       ),
+                    ),
+                  ),
+                ),
+<<<<<<< HEAD
+              ),
+            ),
+          ),
+=======
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 55,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: _isAgreed
+                    ? LinearGradient(
+                        colors: [
+                          Color(0xFF00C4FF).withOpacity(0.3),
+                          Color(0xFF0094FF).withOpacity(0.4),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      )
+                    : null,
+                color: _isAgreed ? null : Colors.grey.withOpacity(0.3),
+                boxShadow: _isAgreed
+                    ? [
+                        BoxShadow(
+                          color: Color(0xFF00C4FF).withOpacity(0.3),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _isAgreed
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => OtpVerification(
+                                phoneNumber: _phoneController.text,
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    width: 56,
+                    height: 56,
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.arrow_forward,
+                      color: _isAgreed ? Colors.white : Colors.white54,
+                      size: 28,
                     ),
                   ),
                 ),
               ),
             ),
-          ),
+          )
+>>>>>>> recovered-20260202
         ],
       ),
     );
   }
+<<<<<<< HEAD
+=======
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+>>>>>>> recovered-20260202
 }

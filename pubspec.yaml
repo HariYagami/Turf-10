@@ -18,6 +18,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+<<<<<<< HEAD
   objectbox: ^5.0.1
   google_fonts: ^6.3.2
   provider: ^6.1.5+1
@@ -25,10 +26,27 @@ dependencies:
   flutter_svg: ^2.2.1
   geolocator: ^14.0.2
   geocoding: ^4.0.0
+=======
+  objectbox: ^5.1.0
+  google_fonts: ^6.1.0
+  objectbox_flutter_libs: ^5.1.0
+  provider: ^6.1.5+1
+  carousel_slider: ^5.1.1
+  pdf: ^3.10.4
+  share_plus: ^7.2.1
+  uuid: ^4.2.1
+  path_provider: ^2.1.1
+
+  flutter_svg: ^2.2.1
+  geolocator: ^14.0.2
+  geocoding: ^4.0.0
+  flutter_blue_plus: ^1.32.12
+>>>>>>> recovered-20260202
   bluetooth_classic: ^0.0.4
   permission_handler: ^12.0.1
   device_info_plus: ^12.3.0
   sqflite: ^2.3.0
+<<<<<<< HEAD
   shared_preferences: ^2.2.2
   path: ^1.8.3
   # The following adds the Cupertino Icons font to your application.
@@ -40,6 +58,27 @@ dev_dependencies:
   flutter_test:
   
     sdk: flutter
+=======
+  fl_chart: ^0.68.0
+  shared_preferences: ^2.2.2
+  printing: ^5.11.0
+
+  path: ^1.8.3
+  lottie: ^3.1.0
+  # The following adds the Cupertino Icons font to your application.
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+
+dev_dependencies:
+  
+  flutter_test:
+
+  
+    sdk: flutter
+  objectbox_generator: ^5.1.0
+  build_runner: ^2.4.6
+
+>>>>>>> recovered-20260202
 
   # The "flutter_lints" package below contains a set of recommended lints
   flutter_lints: ^6.0.0
@@ -97,6 +136,16 @@ flutter:
     - assets/images/megaphone.png
     - assets/images/icons/logo2.avif
     - assets/images/costumer.png
+<<<<<<< HEAD
+=======
+    - assets/images/Duck Out.lottie
+    - assets/images/CRICKET OUT ANIMATION.lottie
+    - assets/images/Scored 4.lottie
+    - assets/images/SIX ANIMATION.lottie
+    - assets/images/Sports loader.json
+    - assets/images/Cricket bat & ball bouncing loader.json
+    - assets/images/balls.json
+>>>>>>> recovered-20260202
 
 
 

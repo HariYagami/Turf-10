@@ -12,7 +12,11 @@ class SlidingPage extends StatefulWidget {
 class _SlidingPageState extends State<SlidingPage> {
   int _currentIndex = 0; // Track the current slide
   final CarouselSliderController _carouselController = CarouselSliderController();
+<<<<<<< HEAD
 
+=======
+ 
+>>>>>>> recovered-20260202
   final List<Map<String, String>> pages = [
     {'image': 'assets/images/page1.png', 'text': 'Sport Trax.'},
     {'image': 'assets/images/page2.png', 'text': 'Your New Favourite Place.'},
@@ -70,7 +74,10 @@ class _SlidingPageState extends State<SlidingPage> {
             ),
           ),
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> recovered-20260202
           Positioned(
             bottom: 110,
             left: 0,
@@ -93,6 +100,59 @@ class _SlidingPageState extends State<SlidingPage> {
             ),
           ),
 
+<<<<<<< HEAD
+=======
+          // Skip button at bottom left (circular with same styling as arrow button)
+          if (_currentIndex < pages.length - 1)
+            Positioned(
+              bottom: 30,
+              left: 30,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFF00C4FF).withOpacity(0.3),
+                      Color(0xFF0094FF).withOpacity(0.4),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0xFF00C4FF).withOpacity(0.3),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      _carouselController.animateToPage(
+                        pages.length - 1,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(30),
+                    child: Container(
+                      width: 56,
+                      height: 56,
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.skip_next,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+>>>>>>> recovered-20260202
           // Arrow navigation button at bottom right
           if (_currentIndex < pages.length - 1)
             Positioned(
