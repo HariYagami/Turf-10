@@ -254,7 +254,7 @@ class _CricketScorerHeaderState extends State<CricketScorerHeader> {
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: SelectableText(
-                                            'hariprasaathabs@gmail.com',
+                                            'antony.cyril@aerobiosys.com',
                                             style: GoogleFonts.poppins(
                                               fontSize: 14,
                                               fontWeight: FontWeight.w600,

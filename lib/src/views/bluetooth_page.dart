@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:lottie/lottie.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:TURF_TOWN_/src/Menus/setting.dart';
 import 'package:TURF_TOWN_/src/services/bluetooth_service.dart';
 
 class BluetoothPage extends StatefulWidget {
@@ -26,7 +28,7 @@ class _BluetoothPageState extends State<BluetoothPage>
 
   StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
   StreamSubscription<List<ScanResult>>? _scanSubscription;
-  
+
   // 🔥 NEW: Store connected device ID for highlighting
   String? _connectedDeviceId;
 
@@ -38,8 +40,9 @@ class _BluetoothPageState extends State<BluetoothPage>
       vsync: this,
     );
     _animation = Tween<double>(begin: 0, end: 1).animate(_animationController);
+
     _initBluetooth();
-    
+
     // 🔥 NEW: Check if already connected on page load
     _checkExistingConnection();
   }
@@ -121,7 +124,7 @@ class _BluetoothPageState extends State<BluetoothPage>
       _showSnackBar('Already connected. Disconnect first to scan again.', Colors.orange);
       return;
     }
-    
+
     await _requestPermissions();
 
     if (Platform.isAndroid) {
@@ -436,42 +439,58 @@ class _BluetoothPageState extends State<BluetoothPage>
                         ),
                       ],
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.settings,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      onPressed: () {},
-                    ),
+                IconButton(
+  icon: const Icon(
+    Icons.settings,
+    color: Colors.white,
+    size: 24,
+  ),
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
+  },
+),
                   ],
                 ),
               ),
               Container(
                 margin: const EdgeInsets.symmetric(vertical: 20),
-                child: isSearching
-                    ? RotationTransition(
-                        turns: _animation,
-                        child: const Icon(
-                          Icons.bluetooth_searching,
-                          size: 100,
-                          color: Colors.blueAccent,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  transitionBuilder: (child, animation) {
+                    return ScaleTransition(
+                      scale: animation,
+                      child: child,
+                    );
+                  },
+                  child: isSearching || isConnected
+                      ? SizedBox(
+                          key: const ValueKey('animation'),
+                          width: 200,
+                          height: 200,
+                          // 🔥 Lottie animation with smooth transition
+                          child: Lottie.asset(
+                            'assets/images/balls.json',
+                            fit: BoxFit.contain,
+                            repeat: isSearching || isConnected,
+                          ),
+                        )
+                      : Icon(
+                          key: const ValueKey('icon'),
+                          Icons.bluetooth_disabled,
+                          size: 140,
+                          color: Colors.grey,
                         ),
-                      )
-                    : Icon(
-                        isConnected
-                            ? Icons.bluetooth_connected
-                            : Icons.bluetooth_disabled,
-                        size: 100,
-                        color: isConnected
-                            ? Colors.greenAccent
-                            : Colors.grey,
-                      ),
+                ),
               ),
               Text(
                 isConnected
                     ? 'Connected to $deviceName'
-                    : (isSearching ? 'Searching...' : 'Not Connected'),
+                    : 'Not Connected',
                 style: TextStyle(
                   color: isConnected
                       ? Colors.greenAccent
@@ -623,6 +642,7 @@ class _BluetoothPageState extends State<BluetoothPage>
                                               : Colors.blueAccent,
                                           fontSize: 12,
                                         ),
+                                        
                                       ),
                                     )
                                   : null,

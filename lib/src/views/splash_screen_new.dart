@@ -15,6 +15,8 @@ class _SplashScreenNewState extends State<SplashScreenNew>
     with TickerProviderStateMixin {
   late AnimationController _zoomController;
   late Animation<double> _zoomAnimation;
+  late AnimationController _titleScaleController;
+  late Animation<double> _titleScaleAnimation;
 
   int _currentAnimationPhase = 0; // 0: Sports loader, 1: Cricket loader, 2: App name
   bool _showAppName = false;
@@ -30,6 +32,16 @@ class _SplashScreenNewState extends State<SplashScreenNew>
 
     _zoomAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _zoomController, curve: Curves.easeInOut),
+    );
+
+    // 🔥 NEW: Scale transition controller for CricSync title (0.0 → 1.0 smooth zoom)
+    _titleScaleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+
+    _titleScaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _titleScaleController, curve: Curves.easeOut),
     );
 
     _startAnimationSequence();
@@ -48,13 +60,15 @@ class _SplashScreenNewState extends State<SplashScreenNew>
       }
     });
 
-    // Phase 3: Display app name after all animations
+    // Phase 3: Display app name after all animations and trigger title scale
     Timer(const Duration(milliseconds: 6400), () {
       if (mounted) {
         setState(() {
           _currentAnimationPhase = 2;
           _showAppName = true;
         });
+        // 🔥 NEW: Start title scale animation (0.0 → 1.0 smooth zoom in 500ms)
+        _titleScaleController.forward();
       }
     });
 
@@ -78,6 +92,7 @@ class _SplashScreenNewState extends State<SplashScreenNew>
   @override
   void dispose() {
     _zoomController.dispose();
+    _titleScaleController.dispose();
     super.dispose();
   }
 
@@ -100,12 +115,11 @@ class _SplashScreenNewState extends State<SplashScreenNew>
               ),
             ),
 
-            // App name display (appears after animations)
+            // App name display with scale transition (appears after animations)
             if (_showAppName)
               Center(
-                child: AnimatedOpacity(
-                  opacity: _showAppName ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 800),
+                child: ScaleTransition(
+                  scale: _titleScaleAnimation,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

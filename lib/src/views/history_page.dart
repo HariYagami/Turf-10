@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
+import 'package:TURF_TOWN_/src/Menus/setting.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
@@ -169,7 +170,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: SelectableText(
-                    'hariprasaathabs@gmail.com',
+                    'antony.cyril@aerobiosys.com',
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -207,17 +208,23 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   },
 ),
-                        IconButton(
-                          icon: const Icon(Icons.settings,
-                              color: Colors.white, size: 24),
-                          onPressed: () {},
-                        ),
+                       IconButton(
+  icon: const Icon(Icons.settings,
+      color: Colors.white, size: 24),
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
+      ),
+    );
+  },
+),
                       ],
                     ),
                   ],
                 ),
               ),
-
               // Filter Section
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
