@@ -77,9 +77,10 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> {
   bool _showDuckAnimation = false;
   String? _lastDuckBatsman;
   bool _showRunoutHighlight = false;
+  bool? _lastRow74WasStriker; // null = not yet set (first update)
   int _runoutHighlightIndex = 0;
   bool _showVictoryAnimation = false;
-
+  String? _row74PlayerId;
   // Runout mode blur and highlight - light blur (0.3) with teal tint
   bool _isRunoutModeActive = false;
   // Helper method to determine banner border color
@@ -440,6 +441,8 @@ Future<void> _sendFullLEDLayout() async {
     final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
     final bowlerPlayer     = TeamMember.getByPlayerId(currentBowler!.playerId);
 
+    _row74PlayerId = strikeBatsman!.playerId;
+
     final now     = DateTime.now();
     final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final temp    = (_envService.currentTemperature ?? 27).round();
@@ -467,17 +470,26 @@ Future<void> _sendFullLEDLayout() async {
     final bowlerRuns   = currentBowler!.runsConceded.toString();
     final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
 
-    // 🔥 100ms delay after EACH command
     const int delayPerCommand = 100;
 
     // ── ROW 1 (y=2): Header — time + org + temp ──────────────────────────
     await bleService.sendRawCommands(['TEXT 3 2 1 255 255 200 $timeStr']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
+
     await bleService.sendRawCommands(['TEXT 36 2 1 200 200 255 AEROBIOSYS']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 102 2 1 200 255 200 ${temp}C']);
+
+    final int tempNumWidth = temp.toString().length * 6;
+    final int degreeX = 102 + tempNumWidth;
+    final int cLetterX = degreeX + 4;
+
+    await bleService.sendRawCommands(['TEXT 102 2 1 200 255 200 $temp']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+    await bleService.sendRawCommands(['SHAPE RECT $degreeX 2 2 2 200 255 200 200 255 200']);
+    await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+    await bleService.sendRawCommands(['TEXT $cLetterX 2 1 200 255 200 C']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
     // ── ROW 2 (y=12): Divider ───────────────────────────────────────────
@@ -485,102 +497,98 @@ Future<void> _sendFullLEDLayout() async {
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
     // ── ROW 2 (y=17): Team names ─────────────────────────────────────────
-    // Calculate team name widths (scale 1 = 6px per char)
     final int batW = battingName.length * 6;
     final int bowlW = bowlingName.length * 6;
-
-    // TeamA: center at pixel 28 (range 3-54)
     final int batX = (28 - (batW ~/ 2)).clamp(3, 54 - batW);
-
-    // VS: center within pixels 57-69
     const int vsX = 57;
-
-    // TeamB: center at pixel 98 (range 72-124)
     final int bowlX = (98 - (bowlW ~/ 2)).clamp(72, 124 - bowlW);
 
     await bleService.sendRawCommands(['TEXT $batX 17 1 0 255 255 $battingName']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
+
     await bleService.sendRawCommands(['TEXT $vsX 17 1 255 255 255 VS']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
+
     await bleService.sendRawCommands(['TEXT $bowlX 17 1 255 100 100 $bowlingName']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-    // ── ROW 3 (y=30): Score ──────────────────────────────────────────────
-    const int scrLabelX = 17;
-    const int runsX = 67;
-    const int slashX = 100;
-    const int wicketsX = 112;
+   // ── ROW 3 (y=30): Score ──────────────────────────────────────────────
+const int scrLabelX = 10;   // SCR: starts at x=3
+const int slashX = 100;
+const int wicketsX = 112;
 
-    await bleService.sendRawCommands(['TEXT $scrLabelX 30 2 255 0 255 SCR:']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT $runsX 30 2 255 255 255 $runs']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT $slashX 30 2 255 100 100 /']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT $wicketsX 30 2 255 255 255 $wickets']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
+// SCR: at scale 2 = 4 chars × 12px = 48px wide → ends at x=51
+// So runs must start at x=52 minimum
+final int dynamicRunsX = (78 - (runs.length * 10) ~/ 2).clamp(52, 90);
+
+await bleService.sendRawCommands(['TEXT $scrLabelX 30 2 255 0 255 SCR:']);
+await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+await bleService.sendRawCommands(['TEXT $dynamicRunsX 30 2 255 255 255 $runs']);
+await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+await bleService.sendRawCommands(['TEXT $slashX 30 2 255 100 100 /']);
+await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+await bleService.sendRawCommands(['TEXT $wicketsX 30 2 255 255 255 $wickets']);
+await Future.delayed(Duration(milliseconds: delayPerCommand));
 
     // ── ROW 4 (y=50): CRR + Overs ────────────────────────────────────────
-    await bleService.sendRawCommands(['TEXT 5 50 1 255 255 0 CRR:']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 29 50 1 255 255 0 $crr']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 66 50 1 0 255 0 OVR:']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 90 50 1 0 255 0 $overs(${currentMatch!.overs})']);
+    await bleService.sendRawCommands([
+      'TEXT 5 50 1 255 255 0 CRR:',
+      'TEXT 29 50 1 255 255 0 $crr',
+      'TEXT 66 50 1 0 255 0 OVR:',
+      'TEXT 90 50 1 0 255 0 $overs(${currentMatch!.overs})',
+    ]);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-    // ── ROW 5 (y=60): Bowler ─────────────────────────────────────────────
-    await bleService.sendRawCommands(['TEXT 10 60 1 255 200 200 $bowlerName']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 58 60 1 0 255 0 $bowlerWkts']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 64 60 1 0 255 0 /']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 70 60 1 0 255 0 $bowlerRuns']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
-    await bleService.sendRawCommands(['TEXT 82 60 1 0 255 0 ($bowlerOvers)']);
-    await Future.delayed(Duration(milliseconds: delayPerCommand));
+// ── ROW 5 (y=60): Bowler ─────────────────────────────────────────────
+final paddedBowlerNameInit = bowlerName.padRight(7).substring(0, 7);
+await bleService.sendRawCommands([
+  'TEXT 10 60 1 255 200 200 $paddedBowlerNameInit',
+]);
+await Future.delayed(Duration(milliseconds: delayPerCommand));
+
+await bleService.sendRawCommands([
+  'TEXT 56  60 1 0 255 0 $bowlerWkts',
+  'TEXT 64  60 1 0 255 0 /',
+  'TEXT 70  60 1 0 255 0 $bowlerRuns',
+  'TEXT 90  60 1 0 255 0 (',
+  'TEXT 96  60 1 0 255 0 $bowlerOvers',
+  'TEXT 116 60 1 0 255 0 )',
+]);
+await Future.delayed(Duration(milliseconds: delayPerCommand));
 
     // ── ROW 6 (y=70): Divider ───────────────────────────────────────────
     await bleService.sendRawCommands(['LINE H 0 70 127 70 1 255 255 255']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-    // ── ROW 6 (y=74): Striker ───────────────────────────────────────────
+    // ── ROW 7 (y=74): Striker ───────────────────────────────────────────
     await bleService.sendRawCommands(['TEXT 2 74 1 255 0 0 *']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
+
     await bleService.sendRawCommands(['TEXT 8 74 1 200 255 255 $strikerName']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
+
     await bleService.sendRawCommands(['TEXT 58 74 1 200 255 200 $strikerRuns($strikerBalls)']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-    // ── ROW 6 (y=84): Non-striker ───────────────────────────────────────
+    // 🔥 RECORD which player is at row 74 — this never changes
+    _row74PlayerId = strikeBatsman!.playerId;
+
+    // ── ROW 8 (y=84): Non-striker ───────────────────────────────────────
     await bleService.sendRawCommands(['TEXT 8 84 1 200 200 255 $nonStrikerName']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
-    
+
     await bleService.sendRawCommands(['TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)']);
     await Future.delayed(Duration(milliseconds: delayPerCommand));
 
-    debugPrint('✅ Full LED layout drawn (25 commands with 100ms delays)');
-    
+    debugPrint('✅ Full LED layout drawn with split bowler stats');
+
     // 🔥 START PERIODIC TIME/TEMP UPDATE ONLY AFTER LAYOUT IS COMPLETELY READY
     if (_ledUpdateTimer == null || !_ledUpdateTimer!.isActive) {
       await Future.delayed(const Duration(seconds: 1));
-      
+
       _ledUpdateTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
         debugPrint('⏰ CricketScorerScreen: Periodic LED update triggered');
         _updateLEDTimeAndTemp();
@@ -886,12 +894,24 @@ Future<void> _sendSecondInningsIntroLayout() async {
     final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
 
     // Draw layout with proper delays between command batches
-    await bleService.sendRawCommands([
-      'TEXT 3 2 1 255 255 200 $timeStr',
-      'TEXT 36 2 1 200 200 255 AEROBIOSYS',
-      'TEXT 102 2 1 200 255 200 ${temp}C',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 250));
+  final int tempNumWidth2 = temp.toString().length * 6;
+final int degreeX2 = 102 + tempNumWidth2;
+final int cLetterX2 = degreeX2 + 4;
+
+await bleService.sendRawCommands(['TEXT 3 2 1 255 255 200 $timeStr']);
+await Future.delayed(const Duration(milliseconds: 100));
+
+await bleService.sendRawCommands(['TEXT 36 2 1 200 200 255 AEROBIOSYS']);
+await Future.delayed(const Duration(milliseconds: 100));
+
+await bleService.sendRawCommands(['TEXT 102 2 1 200 255 200 $temp']);
+await Future.delayed(const Duration(milliseconds: 100));
+
+await bleService.sendRawCommands(['SHAPE RECT $degreeX2 2 2 2 200 255 200 200 255 200']);
+await Future.delayed(const Duration(milliseconds: 100));
+
+await bleService.sendRawCommands(['TEXT $cLetterX2 2 1 200 255 200 C']);
+await Future.delayed(const Duration(milliseconds: 250));
 
     await bleService.sendRawCommands([
       'LINE H 0 12 127 12 1 255 255 255',
@@ -911,18 +931,20 @@ Future<void> _sendSecondInningsIntroLayout() async {
     ]);
     await Future.delayed(const Duration(milliseconds: 250));
 
-    const int scrLabelX2 = 17;
-    const int runsX2 = 67;
-    const int slashX2 = 100;
-    const int wicketsX2 = 112;
+// Fix: same spacing logic
+const int scrLabelX2 = 3;
+const int slashX2 = 100;
+const int wicketsX2 = 112;
+final int runsX2 = (78 - (runs.length * 10) ~/ 2).clamp(52, 90);
 
-    await bleService.sendRawCommands([
-      'TEXT $scrLabelX2 30 2 255 0 255 SCR:',
-      'TEXT $runsX2 30 2 255 255 255 $runs',
-      'TEXT $slashX2 30 2 255 100 100 /',
-      'TEXT $wicketsX2 30 2 255 255 255 $wickets',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 250));
+await bleService.sendRawCommands([
+  'TEXT $scrLabelX2 30 2 255 0 255 SCR:',
+  'TEXT $runsX2 30 2 255 255 255 $runs',
+  'TEXT $slashX2 30 2 255 100 100 /',
+  'TEXT $wicketsX2 30 2 255 255 255 $wickets',
+]);
+await Future.delayed(const Duration(milliseconds: 250));
+
 
     await bleService.sendRawCommands([
       'TEXT 5 50 1 255 255 0 CRR:',
@@ -932,14 +954,18 @@ Future<void> _sendSecondInningsIntroLayout() async {
     ]);
     await Future.delayed(const Duration(milliseconds: 250));
 
-    await bleService.sendRawCommands([
-      'TEXT 10 60 1 255 200 200 $bowlerName',
-      'TEXT 58 60 1 0 255 0 $bowlerWkts',
-      'TEXT 64 60 1 0 255 0 /',
-      'TEXT 70 60 1 0 255 0 $bowlerRuns',
-      'TEXT 82 60 1 0 255 0 ($bowlerOvers)',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 250));
+// Replace in _sendSecondInningsIntroLayout:
+ final paddedBowlerName2 = bowlerName.padRight(7).substring(0, 7);
+await bleService.sendRawCommands([
+  'TEXT 10  60 1 255 200 200 $paddedBowlerName2',
+  'TEXT 56  60 1 0 255 0 $bowlerWkts',
+  'TEXT 64  60 1 0 255 0 /',
+  'TEXT 70  60 1 0 255 0 $bowlerRuns',
+  'TEXT 90  60 1 0 255 0 (',
+  'TEXT 96  60 1 0 255 0 $bowlerOvers',
+  'TEXT 116 60 1 0 255 0 )',
+]);
+await Future.delayed(const Duration(milliseconds: 250));
 
     await bleService.sendRawCommands([
       'LINE H 0 70 127 70 1 255 255 255',
@@ -949,7 +975,7 @@ Future<void> _sendSecondInningsIntroLayout() async {
       'TEXT 8 84 1 200 200 255 $nonStrikerName',
       'TEXT 58 84 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
     ]);
-
+    _row74PlayerId = strikeBatsman!.playerId;
     debugPrint('✅ Second innings LED layout drawn');
     
     // Start periodic time/temp update only after layout is complete
@@ -1623,13 +1649,11 @@ void _showLeaveMatchDialog() {
 void addRuns(int runs) {
   if (currentScore == null || strikeBatsman == null || currentBowler == null) return;
 
-  // Handle runout mode
   if (isRunout) {
     addRunout(runs);
     return;
   }
 
-  // Dismiss blur overlay when any score is pressed (non-runout mode)
   if (_isRunoutModeActive) {
     setState(() {
       _isRunoutModeActive = false;
@@ -1672,14 +1696,14 @@ void addRuns(int runs) {
     String ballDisplay = runs.toString();
     bool countBallForBatsman = true;
     bool countBallForBowler = true;
-    
+
     if (isNoBall) {
       extrasRuns = 1;
       totalRunsToAdd = 1;
       countBallForBatsman = false;
       countBallForBowler = false;
       currentScore!.noBalls += 1;
-      
+
       if (isByes) {
         totalRunsToAdd += runs;
         currentScore!.byes += runs;
@@ -1696,9 +1720,9 @@ void addRuns(int runs) {
         strikeBatsman!.extras += extrasRuns;
         strikeBatsman!.save();
       }
-      
+
       runsInCurrentOver += totalRunsToAdd;
-      
+
     } else if (isWide) {
       if (isByes) {
         totalRunsToAdd = 1 + runs;
@@ -1716,39 +1740,39 @@ void addRuns(int runs) {
         currentScore!.wides += 1;
         ballDisplay = 'WD';
       }
-      
+
       countBallForBatsman = false;
       countBallForBowler = false;
-      
+
       strikeBatsman!.extras += extrasRuns;
       strikeBatsman!.save();
-      
+
       runsInCurrentOver += totalRunsToAdd;
-      
+
     } else if (isByes) {
       extrasRuns = runs;
       totalRunsToAdd = runs;
       ballDisplay = 'B$runs';
       currentScore!.byes += runs;
-      
+
       strikeBatsman!.updateStats(0, extrasRuns: extrasRuns, countBall: true);
-      
+
       runsInCurrentOver += runs;
-      
+
     } else {
       totalRunsToAdd = runs;
       batsmanRuns = runs;
-      
+
       strikeBatsman!.updateStats(batsmanRuns, extrasRuns: 0, countBall: true);
-      
+
       runsInCurrentOver += runs;
     }
 
     currentBowler!.updateStats(
-      totalRunsToAdd, 
-      false, 
-      extrasRuns: extrasRuns, 
-      countBall: countBallForBowler
+      totalRunsToAdd,
+      false,
+      extrasRuns: extrasRuns,
+      countBall: countBallForBowler,
     );
 
     var tempOver = currentScore!.currentOver;
@@ -1758,11 +1782,12 @@ void addRuns(int runs) {
     if (countBallForBowler) _updateOverTracking();
 
     currentScore!.totalRuns += totalRunsToAdd;
-    currentScore!.crr = currentScore!.overs > 0 ? (currentScore!.totalRuns / currentScore!.overs) : 0.0;
+    currentScore!.crr = currentScore!.overs > 0
+        ? (currentScore!.totalRuns / currentScore!.overs)
+        : 0.0;
     currentScore!.save();
 
-    // UPDATE LED DISPLAY - ADD THIS
-    _updateLEDAfterScore();
+    // 🔥 NO LED CALL HERE — wait until all strike switches are done below
 
     // Trigger boundary animations
     if (runs == 4) {
@@ -1775,41 +1800,49 @@ void addRuns(int runs) {
       if (_checkSecondInningsVictory()) return;
     }
 
-   if (countBallForBowler && currentScore!.currentBall % 6 == 0) {
-  if (runsInCurrentOver == 0) {
-    currentBowler!.incrementMaiden();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Maiden Over! 🎯'),
-        duration: Duration(seconds: 2),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
+    if (countBallForBowler && currentScore!.currentBall % 6 == 0) {
+      if (runsInCurrentOver == 0) {
+        currentBowler!.incrementMaiden();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Maiden Over! 🎯'),
+            duration: Duration(seconds: 2),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
 
-  runsInCurrentOver = 0;
+      runsInCurrentOver = 0;
 
-  // SWAP FOR EVEN RUNS AT END OF OVER
-  if (runs % 2 == 0) _switchStrike();
-  
-  if (_isInningsComplete()) {
-    _endInnings();
-    return;
-  }
+      // Swap for even runs at end of over
+      if (runs % 2 == 0) _switchStrike();
 
-  _showChangeBowlerDialog();
-  _resetCurrentOver();
-  
-  // 🔥 UPDATE LED AFTER OVER COMPLETION AND STRIKE SWAP
-  _updateLEDAfterScore();
-  
-} else if (runs % 2 == 1 && !isByes && !isWide) {
-  // SWAP FOR ODD RUNS DURING OVER
-  _switchStrike();
-  
-  // 🔥 UPDATE LED IMMEDIATELY AFTER ODD RUN SWAP
-  _updateLEDAfterScore();
-}
+      if (_isInningsComplete()) {
+        // 🔥 Single LED call before ending innings
+        _updateLEDAfterScore();
+        _endInnings();
+        return;
+      }
+
+      _showChangeBowlerDialog();
+      _resetCurrentOver();
+
+      // 🔥 Single LED call — AFTER all strike switches for end-of-over
+      _updateLEDAfterScore();
+
+    } else if (runs % 2 == 1 && !isByes && !isWide) {
+      // Swap for odd runs during over
+      _switchStrike();
+
+      // 🔥 Single LED call — AFTER strike switch for odd runs
+      _updateLEDAfterScore();
+
+    } else {
+      // Even runs mid-over, no switch — still need one LED call
+      // 🔥 Single LED call for even runs (no switch)
+      _updateLEDAfterScore();
+    }
+
     isNoBall = false;
     isWide = false;
     isByes = false;
@@ -1817,36 +1850,37 @@ void addRuns(int runs) {
   });
 }
 
-  void addWicket() {
+ void addWicket() {
   if (currentScore == null || strikeBatsman == null || currentBowler == null) return;
 
+  // 🔥 Save state BEFORE making any changes
+  final savedAction = {
+    'type': 'wicket',
+    'strikeBatsmanId': strikeBatsman!.batId,
+    'nonStrikeBatsmanId': nonStrikeBatsman!.batId,
+    'batsmanIsOut': strikeBatsman!.isOut,
+    'batsmanBowlerWhoGotWicket': strikeBatsman!.bowlerIdWhoGotWicket,
+    'batsmanExtras': strikeBatsman!.extras,
+    'bowlerWickets': currentBowler!.wickets,
+    'bowlerBalls': currentBowler!.balls,
+    'bowlerRuns': currentBowler!.runsConceded,
+    'bowlerMaidens': currentBowler!.maidens,
+    'bowlerExtras': currentBowler!.extras,
+    'runsInCurrentOver': runsInCurrentOver,
+    'wickets': currentScore!.wickets,
+    'currentBall': currentScore!.currentBall,
+    'currentOver': List<String>.from(currentScore!.currentOver),
+  };
+
   setState(() {
-    actionHistory.add({
-      'type': 'wicket',
-      'strikeBatsmanId': strikeBatsman!.batId,
-      'nonStrikeBatsmanId': nonStrikeBatsman!.batId,
-      'batsmanIsOut': strikeBatsman!.isOut,
-      'batsmanBowlerWhoGotWicket': strikeBatsman!.bowlerIdWhoGotWicket,
-      'batsmanExtras': strikeBatsman!.extras,
-      'bowlerWickets': currentBowler!.wickets,
-      'bowlerBalls': currentBowler!.balls,
-      'bowlerRuns': currentBowler!.runsConceded,
-      'bowlerMaidens': currentBowler!.maidens,
-      'bowlerExtras': currentBowler!.extras,
-      'runsInCurrentOver': runsInCurrentOver,
-      'wickets': currentScore!.wickets,
-      'currentBall': currentScore!.currentBall,
-      'currentOver': List<String>.from(currentScore!.currentOver),
-    });
+    actionHistory.add(savedAction);
 
     strikeBatsman!.markAsOut(bowlerIdWhoGotWicket: currentBowler!.bowlerId);
     currentScore!.wickets++;
     currentBowler!.updateStats(0, true, extrasRuns: 0, countBall: true);
 
-    // Trigger wicket animation
     _triggerWicketAnimation();
 
-    // Check for duck (0 runs)
     if (strikeBatsman!.runs == 0) {
       _triggerDuckAnimation(strikeBatsman!.batId);
     }
@@ -1860,10 +1894,9 @@ void addRuns(int runs) {
     if (currentInnings != null) {
       final teamMembers = TeamMember.getByTeamId(currentInnings!.battingTeamId);
       final totalTeamMembers = teamMembers.length;
-      
+
       if (currentScore!.wickets >= totalTeamMembers - 1) {
         currentScore!.save();
-        // UPDATE LED DISPLAY - ADD THIS
         _updateLEDAfterScore();
         _endInnings();
         return;
@@ -1872,18 +1905,16 @@ void addRuns(int runs) {
 
     if (_isInningsComplete()) {
       currentScore!.save();
-      // UPDATE LED DISPLAY - ADD THIS
       _updateLEDAfterScore();
       _endInnings();
       return;
     }
 
     currentScore!.save();
-    
-    // UPDATE LED DISPLAY - ADD THIS
     _updateLEDAfterScore();
 
-    _showSelectNextBatsmanDialog();
+    // 🔥 Pass savedAction so we can undo if user cancels
+    _showSelectNextBatsmanDialog(onCancel: () => _undoWicket(savedAction));
 
     if (currentScore!.currentBall % 6 == 0) {
       if (runsInCurrentOver == 0) {
@@ -1897,12 +1928,70 @@ void addRuns(int runs) {
         );
       }
       runsInCurrentOver = 0;
-      
       _showChangeBowlerDialog();
       _resetCurrentOver();
       _switchStrike();
     }
   });
+}
+
+// 🔥 NEW: Undo a wicket when user cancels batsman selection
+void _undoWicket(Map<String, dynamic> savedAction) {
+  setState(() {
+    // Remove the last action from history
+    if (actionHistory.isNotEmpty && actionHistory.last['type'] == 'wicket') {
+      actionHistory.removeLast();
+    }
+
+    // Restore batsman state
+    final strikerBatId = savedAction['strikeBatsmanId'];
+    final batsman = Batsman.getByBatId(strikerBatId);
+    if (batsman != null) {
+      batsman.isOut = savedAction['batsmanIsOut'];
+      batsman.bowlerIdWhoGotWicket = savedAction['batsmanBowlerWhoGotWicket'];
+      batsman.extras = savedAction['batsmanExtras'];
+      batsman.save();
+    }
+
+    strikeBatsman = Batsman.getByBatId(savedAction['strikeBatsmanId']);
+    nonStrikeBatsman = Batsman.getByBatId(savedAction['nonStrikeBatsmanId']);
+
+    // Restore bowler state
+    if (currentBowler != null) {
+      currentBowler!.wickets = savedAction['bowlerWickets'];
+      currentBowler!.balls = savedAction['bowlerBalls'];
+      currentBowler!.runsConceded = savedAction['bowlerRuns'];
+      currentBowler!.maidens = savedAction['bowlerMaidens'];
+      currentBowler!.extras = savedAction['bowlerExtras'];
+
+      int completedOvers = currentBowler!.balls ~/ 6;
+      int remainingBalls = currentBowler!.balls % 6;
+      currentBowler!.overs = completedOvers + (remainingBalls / 10.0);
+
+      double totalOvers = completedOvers + (remainingBalls / 6.0);
+      currentBowler!.economy = totalOvers > 0 ? (currentBowler!.runsConceded / totalOvers) : 0.0;
+
+      currentBowler!.save();
+      currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
+    }
+
+    // Restore score state
+    currentScore!.wickets = savedAction['wickets'];
+    currentScore!.currentBall = savedAction['currentBall'];
+    currentScore!.currentOver = List<String>.from(savedAction['currentOver']);
+    runsInCurrentOver = savedAction['runsInCurrentOver'];
+    currentScore!.save();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Wicket cancelled'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  });
+
+  _updateLEDAfterScore();
 }
 
 void addRunout(int runs) {
@@ -2142,7 +2231,7 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
   });
 }
 
- void _showSelectNextBatsmanDialog() {
+void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
   if (currentInnings == null) return;
 
   final allBatsmenInInnings = Batsman.getByInningsAndTeam(
@@ -2152,7 +2241,7 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
 
   final teamPlayers = TeamMember.getByTeamId(currentInnings!.battingTeamId);
   final playersWhoBatted = allBatsmenInInnings.map((b) => b.playerId).toSet();
-  final availablePlayers = teamPlayers.where((p) => 
+  final availablePlayers = teamPlayers.where((p) =>
     !playersWhoBatted.contains(p.playerId)
   ).toList();
 
@@ -2165,51 +2254,86 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
   showDialog(
     context: context,
     barrierDismissible: false,
-    builder: (context) => AlertDialog(
-      backgroundColor: const Color(0xFF1C1F24),
-      title: const Text('Select Next Batsman', style: TextStyle(color: Colors.white)),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView(
-          shrinkWrap: true,
+    builder: (context) => WillPopScope(
+      // 🔥 Intercept back button to trigger cancel
+      onWillPop: () async {
+        Navigator.of(context).pop();
+        onCancel?.call();
+        return false;
+      },
+      child: AlertDialog(
+        backgroundColor: const Color(0xFF1C1F24),
+        title: Row(
           children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                'Available Batsmen:',
-                style: TextStyle(color: Color(0xFF6D7CFF), fontWeight: FontWeight.bold, fontSize: 12),
-              ),
+            const Expanded(
+              child: Text('Select Next Batsman', style: TextStyle(color: Colors.white)),
             ),
-            ...availablePlayers.map((player) {
-              return ListTile(
-                title: Text(player.teamName, style: const TextStyle(color: Colors.white)),
-                subtitle: Text('ID: ${player.playerId}', style: const TextStyle(color: Color(0xFF8F9499))),
-                onTap: () {
-                  final newBatsman = Batsman.create(
-                    inningsId: currentInnings!.inningsId,
-                    teamId: currentInnings!.battingTeamId,
-                    playerId: player.playerId,
-                  );
-                  
-                  setState(() {
-                    strikeBatsman = newBatsman;
-                    currentScore!.strikeBatsmanId = newBatsman.batId;
-                    currentScore!.save();
-                  });
-                  
-                  Navigator.pop(context);
-                  
-                  // 🔥 ADD THIS - UPDATE LED IMMEDIATELY AFTER BATSMAN CHANGE
-                  _updateLEDAfterScore();
-                },
-              );
-            }).toList(),
+            // 🔥 X button to cancel
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white54),
+              onPressed: () {
+                Navigator.of(context).pop();
+                onCancel?.call();
+              },
+              tooltip: 'Cancel wicket',
+            ),
           ],
         ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  'Available Batsmen:',
+                  style: TextStyle(color: Color(0xFF6D7CFF), fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+              ...availablePlayers.map((player) {
+                return ListTile(
+                  title: Text(player.teamName, style: const TextStyle(color: Colors.white)),
+                  subtitle: Text('ID: ${player.playerId}', style: const TextStyle(color: Color(0xFF8F9499))),
+                  onTap: () {
+                    final newBatsman = Batsman.create(
+                      inningsId: currentInnings!.inningsId,
+                      teamId: currentInnings!.battingTeamId,
+                      playerId: player.playerId,
+                    );
+
+                    setState(() {
+                      strikeBatsman = newBatsman;
+                      currentScore!.strikeBatsmanId = newBatsman.batId;
+                      currentScore!.save();
+                    });
+
+                    Navigator.pop(context);
+                    _updateLEDAfterScore();
+                  },
+                );
+              }).toList(),
+            ],
+          ),
+        ),
+        // 🔥 Cancel button in actions
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              onCancel?.call();
+            },
+            child: const Text(
+              'Cancel Wicket',
+              style: TextStyle(color: Color(0xFFFF6B6B)),
+            ),
+          ),
+        ],
       ),
     ),
   );
 }
+
  void _showChangeBowlerDialog() {
   if (currentInnings == null) return;
 
@@ -2955,7 +3079,6 @@ void swapPlayers() {
         currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
       }
 
-      // RESTORE SCORE EXTRAS COUNTS - ADDED
       if (lastAction.containsKey('byes')) {
         currentScore!.byes = lastAction['byes'];
       }
@@ -3013,7 +3136,6 @@ void swapPlayers() {
         currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
       }
 
-      // RESTORE SCORE EXTRAS COUNTS FOR WICKET UNDO
       if (lastAction.containsKey('byes')) {
         currentScore!.byes = lastAction['byes'];
       }
@@ -3034,7 +3156,6 @@ void swapPlayers() {
       }
       
     } else if (actionType == 'runout') {
-      // Restore striker stats
       final strikerBatId = lastAction['strikeBatsmanId'];
       final strikerBat = Batsman.getByBatId(strikerBatId);
       if (strikerBat != null) {
@@ -3050,7 +3171,6 @@ void swapPlayers() {
         strikerBat.save();
       }
 
-      // Restore run out batsman
       final runoutBatId = lastAction['runoutBatsmanId'];
       final runoutBat = Batsman.getByBatId(runoutBatId);
       if (runoutBat != null) {
@@ -3063,7 +3183,6 @@ void swapPlayers() {
       strikeBatsman = Batsman.getByBatId(strikerBatId);
       nonStrikeBatsman = Batsman.getByBatId(lastAction['nonStrikeBatsmanId']);
 
-      // Restore bowler stats
       if (currentBowler != null) {
         currentBowler!.runsConceded = lastAction['bowlerRuns'];
         currentBowler!.balls = lastAction['bowlerBalls'];
@@ -3082,7 +3201,6 @@ void swapPlayers() {
         currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
       }
 
-      // Restore score
       currentScore!.totalRuns = lastAction['totalRuns'];
       currentScore!.wickets = lastAction['wickets'];
       currentScore!.currentBall = lastAction['currentBall'];
@@ -3101,6 +3219,10 @@ void swapPlayers() {
 
     currentScore!.save();
 
+    // 🔥 Force star to re-evaluate its position after undo
+    // (strike may have swapped back, so we can't assume previous direction)
+    _lastRow74WasStriker = null;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Action undone successfully'),
@@ -3109,6 +3231,9 @@ void swapPlayers() {
       ),
     );
   });
+
+  // 🔥 Update LED OUTSIDE setState so it runs after state is fully committed
+  _updateLEDAfterScore();
 }
 Future<void> _updateLEDAfterScore() async {
   try {
@@ -3125,7 +3250,7 @@ Future<void> _updateLEDAfterScore() async {
       return;
     }
 
-    debugPrint('📤 Updating LED score (CHANGE only, static layout preserved)...');
+    debugPrint('📤 Updating LED score (targeted)...');
 
     final strikerPlayer    = TeamMember.getByPlayerId(strikeBatsman!.playerId);
     final nonStrikerPlayer = TeamMember.getByPlayerId(nonStrikeBatsman!.playerId);
@@ -3136,55 +3261,93 @@ Future<void> _updateLEDAfterScore() async {
       return (n.length > max ? n.substring(0, max) : n).toUpperCase();
     }
 
-    final strikerName    = trunc(strikerPlayer?.teamName,    7);
-    final nonStrikerName = trunc(nonStrikerPlayer?.teamName, 7);
-    final bowlerName     = trunc(bowlerPlayer?.teamName,     7);
+    final runs        = currentScore!.totalRuns.toString();
+    final wickets     = currentScore!.wickets.toString();
+    final overs       = currentScore!.overs.toStringAsFixed(1);
+    final crr         = currentScore!.crr.toStringAsFixed(2);
 
-    final runs         = currentScore!.totalRuns.toString();
-    final wickets      = currentScore!.wickets.toString();
-    final overs        = currentScore!.overs.toStringAsFixed(1);
-    final crr          = currentScore!.crr.toStringAsFixed(2);
-    final strikerRuns  = strikeBatsman!.runs.toString();
-    final strikerBalls = strikeBatsman!.ballsFaced.toString();
-    final nsBatsRuns   = nonStrikeBatsman!.runs.toString();
-    final nsBatsBalls  = nonStrikeBatsman!.ballsFaced.toString();
-    final bowlerWkts   = currentBowler!.wickets.toString();
-    final bowlerRuns   = currentBowler!.runsConceded.toString();
-    final bowlerOvers  = currentBowler!.overs.toStringAsFixed(1);
+    final bowlerWkts  = currentBowler!.wickets.toString();
+    final bowlerRuns  = currentBowler!.runsConceded.toString();
+    final bowlerOvers = currentBowler!.overs.toStringAsFixed(1);
 
-    // CHANGE areas must NOT overlap:
-    // Runs: x=67, width=33 → clears 67-99 (ends before slash)
-    // Slash: x=100 (static, never changes) → occupies 100-111
-    // Wickets: x=112, width=16 → clears 112-127 (does not overlap)
-    final commands = [
-      // Score: runs and wickets with NON-OVERLAPPING clear areas
-      'CHANGE 67  30 33 14 2 255 255 255 $runs',       // Runs: width=33 (clears 67-99, stops before slash at 100)
-      'CHANGE 112 30 16 14 2 255 255 255 $wickets',    // Wickets: width=16 (clears 112-127, enough for 2 digits)
-// CRR and overs
-'CHANGE 29  50 29 10 1 255 255 0   $crr',
-'CHANGE 90  50 20 10 1 0   255 0   $overs',
-      // Bowler: name + stats
-      'CHANGE 10  60 46 10 1 255 200 200 $bowlerName',
-      'CHANGE 58  60 22 10 1 0   255 0   $bowlerWkts',
-      'CHANGE 64  60 6  10 1 0   255 0   /',
-      'CHANGE 70  60 28 10 1 0   255 0   $bowlerRuns',
-      'CHANGE 82  60 45 10 1 0   255 0   ($bowlerOvers)',
-      // Batsmen rows
-      'CHANGE 8   74 48 10 1 200 255 255 $strikerName',
-      'CHANGE 58  74 69 10 1 200 255 200 $strikerRuns($strikerBalls)',
-      'CHANGE 8   84 48 10 1 200 200 255 $nonStrikerName',
-      'CHANGE 58  84 69 10 1 200 255 200 $nsBatsRuns($nsBatsBalls)',
-    ];
+    final row74IsStriker = strikeBatsman!.playerId == _row74PlayerId;
 
-    await bleService.sendRawCommands(commands);
+    final row74Player = row74IsStriker ? strikerPlayer    : nonStrikerPlayer;
+    final row84Player = row74IsStriker ? nonStrikerPlayer : strikerPlayer;
+    final row74Bat    = row74IsStriker ? strikeBatsman!   : nonStrikeBatsman!;
+    final row84Bat    = row74IsStriker ? nonStrikeBatsman! : strikeBatsman!;
 
-    debugPrint('✅ LED updated — $runs/$wickets ($overs) CRR:$crr');
+    final row74Name  = trunc(row74Player?.teamName, 7);
+    final row84Name  = trunc(row84Player?.teamName, 7);
+    final row74Runs  = row74Bat.runs.toString();
+    final row74Balls = row74Bat.ballsFaced.toString();
+    final row84Runs  = row84Bat.runs.toString();
+    final row84Balls = row84Bat.ballsFaced.toString();
+
+    final bool starMoved = _lastRow74WasStriker == null ||
+                           _lastRow74WasStriker != row74IsStriker;
+    _lastRow74WasStriker = row74IsStriker;
+
+   // ── Score: fix erase zone to not overlap SCR: label ──
+// SCR: at x=3, scale=2, 4 chars = 48px → ends at x=51
+// Runs zone: erase from x=52 to x=99 (47px wide)
+final int runsX = (78 - (runs.length * 10) ~/ 2).clamp(52, 90);
+
+final List<String> allCommands = [
+  // ── Score ─────────────────────────────────────────────────────
+  // Erase only the runs zone (x=52 to x=99), NOT the SCR: label
+  'CHANGE 52  30 48 14 2 0 0 0 ',
+  'CHANGE $runsX 30 ${runs.length * 12} 14 2 255 255 255 $runs',
+  // Wickets: fixed position
+  'CHANGE 112 30 16 14 2 255 255 255 $wickets',
+
+// ── CRR + Overs ───────────────────────────────────────────────
+'CHANGE 29 50 30 10 1 255 255 0 $crr',
+'CHANGE 90 50 46 10 1 0 255 0 $overs(${currentMatch!.overs})',
+
+// ── Bowler stats ──────────────────────────────────────────────────────
+// First: erase the ENTIRE bowler stats zone in one shot
+'CHANGE 56 60 71 10 1 0 0 0 ',
+// Then redraw each part
+'CHANGE 56  60 12 10 1 0 255 0 $bowlerWkts',
+'CHANGE 64  60 6  10 1 0 255 0 /',
+'CHANGE 70  60 20 10 1 0 255 0 $bowlerRuns',
+'CHANGE 90  60 6  10 1 0 255 0 (',
+'CHANGE 96  60 24 10 1 0 255 0 $bowlerOvers',
+'CHANGE 120 60 6  10 1 0 255 0 )',
+
+  // ── Batsman rows ──────────────────────────────────────────────
+  'CHANGE 8  74 48 10 1 200 255 255 $row74Name',
+  'CHANGE 58 74 69 10 1 200 255 200 $row74Runs($row74Balls)',
+  'CHANGE 8  84 48 10 1 200 200 255 $row84Name',
+  'CHANGE 58 84 69 10 1 200 255 200 $row84Runs($row84Balls)',
+];
+    await bleService.sendRawCommands(allCommands);
+
+    // ── Star: only move if striker changed ────────────────────────────
+    if (starMoved) {
+      await Future.delayed(const Duration(milliseconds: 30));
+      if (row74IsStriker) {
+        await bleService.sendRawCommands([
+          'CHANGE 2 84 6 10 1 0 0 0 *',
+          'CHANGE 2 74 6 10 1 255 0 0 *',
+        ]);
+      } else {
+        await bleService.sendRawCommands([
+          'CHANGE 2 74 6 10 1 0 0 0 *',
+          'CHANGE 2 84 6 10 1 255 0 0 *',
+        ]);
+      }
+    }
+
+    debugPrint('✅ LED updated — $runs/$wickets ($overs) CRR:$crr | '
+               'Bowler: $bowlerWkts/$bowlerRuns($bowlerOvers) | '
+               'row74IsStriker=$row74IsStriker | starMoved=$starMoved');
 
   } catch (e) {
     debugPrint('❌ _updateLEDAfterScore failed: $e');
   }
 }
-
 Future<void> _updateLEDTimeAndTemp() async {
   try {
     final bleService = BleManagerService();

@@ -12,11 +12,7 @@ class SlidingPage extends StatefulWidget {
 class _SlidingPageState extends State<SlidingPage> {
   int _currentIndex = 0; // Track the current slide
   final CarouselSliderController _carouselController = CarouselSliderController();
-<<<<<<< HEAD
-
-=======
  
->>>>>>> recovered-20260202
   final List<Map<String, String>> pages = [
     {'image': 'assets/images/page1.png', 'text': 'Sport Trax.'},
     {'image': 'assets/images/page2.png', 'text': 'Your New Favourite Place.'},
@@ -74,10 +70,6 @@ class _SlidingPageState extends State<SlidingPage> {
             ),
           ),
 
-<<<<<<< HEAD
-
-=======
->>>>>>> recovered-20260202
           Positioned(
             bottom: 110,
             left: 0,
@@ -100,8 +92,6 @@ class _SlidingPageState extends State<SlidingPage> {
             ),
           ),
 
-<<<<<<< HEAD
-=======
           // Skip button at bottom left (circular with same styling as arrow button)
           if (_currentIndex < pages.length - 1)
             Positioned(
@@ -152,7 +142,6 @@ class _SlidingPageState extends State<SlidingPage> {
               ),
             ),
 
->>>>>>> recovered-20260202
           // Arrow navigation button at bottom right
           if (_currentIndex < pages.length - 1)
             Positioned(

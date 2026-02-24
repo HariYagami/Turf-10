@@ -2,27 +2,16 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 
-<<<<<<< HEAD
 import 'package:TURF_TOWN_/src/Screens/privacy.dart';
-=======
-import 'package:TURF_TOWN_/src/Menus/privacy.dart';
->>>>>>> recovered-20260202
 import 'package:TURF_TOWN_/src/views/Venue.dart';
 import 'package:flutter/material.dart';
 import 'package:TURF_TOWN_/src/CommonParameters/AppBackGround1/Appbg1.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-<<<<<<< HEAD
 import 'package:TURF_TOWN_/src/Scorecard/ScoreCard.dart';
 import 'package:TURF_TOWN_/src/models/ScoreController.dart';
 import 'package:TURF_TOWN_/src/widgets/Navigation_bar.dart';
 import 'package:TURF_TOWN_/src/Screens/setting.dart';
 import 'package:TURF_TOWN_/src/Screens/account.dart';
-=======
-
-import 'package:TURF_TOWN_/src/Score_widgets/Navigation_bar.dart';
-import 'package:TURF_TOWN_/src/Menus/setting.dart';
-import 'package:TURF_TOWN_/src/Menus/account.dart';
->>>>>>> recovered-20260202
 import 'package:TURF_TOWN_/src/Pages/Teams/InitialTeamPage.dart';
 // Import the new pages
 import 'package:TURF_TOWN_/src/views/alerts_page.dart';
