@@ -826,25 +826,33 @@ Future<void> _sendSecondInningsIntroLayout() async {
     ]);
     await Future.delayed(const Duration(milliseconds: 250));
 
-    await bleService.sendRawCommands([
-      'TEXT 10 52 1 0 255 255 OVERS:',
-      'TEXT 55 52 1 255 255 255 $inns1Overs',
-    ]);
-    await Future.delayed(const Duration(milliseconds: 250));
+const String oversLabel = 'OVERS:';
+final int oversLabelW = oversLabel.length * 6;
+final int oversValW = inns1Overs.length * 6;
+const int oversGap = 6;
+final int oversTotalW = oversLabelW + oversGap + oversValW;
+final int oversGroupX = ((128 - oversTotalW) / 2).round().clamp(0, 127);
+final int oversValX = oversGroupX + oversLabelW + oversGap;
 
-    const String targetLabel = 'TARGET:';
-    final int targetLabelW = targetLabel.length * 6;
-    final int targetNumW = targetRuns.length * 12;
-    const int targetGap = 8;
-    final int targetTotalW = targetLabelW + targetGap + targetNumW;
-    final int targetGroupX = ((128 - targetTotalW) / 2).round().clamp(0, 127);
-    final int targetNumX = targetGroupX + targetLabelW + targetGap;
+await bleService.sendRawCommands([
+  'TEXT $oversGroupX 52 1 0 255 255 $oversLabel',
+  'TEXT $oversValX 52 1 255 255 255 $inns1Overs',
+]);
+await Future.delayed(const Duration(milliseconds: 250));
 
-    await bleService.sendRawCommands([
-      'LINE H 0 62 127 62 1 255 200 0',
-      'TEXT $targetGroupX 68 1 255 200 0 $targetLabel',
-      'TEXT $targetNumX 68 2 255 255 0 $targetRuns',
-    ]);
+   const String targetLabel = 'TARGET:';
+final int targetLabelW = targetLabel.length * 12; // ← was * 6, scale 2 = 12px per char
+final int targetNumW = targetRuns.length * 12;
+const int targetGap = 8;
+final int targetTotalW = targetLabelW + targetGap + targetNumW;
+final int targetGroupX = ((128 - targetTotalW) / 2).round().clamp(0, 127);
+final int targetNumX = targetGroupX + targetLabelW + targetGap;
+
+await bleService.sendRawCommands([
+  'LINE H 0 62 127 62 1 255 200 0',
+  'TEXT $targetGroupX 68 2 255 200 0 $targetLabel',
+  'TEXT $targetNumX 68 2 255 255 0 $targetRuns',
+]);
     await Future.delayed(const Duration(milliseconds: 250));
 
     const String waitingText = 'WAITING TO START...';
@@ -932,7 +940,7 @@ await Future.delayed(const Duration(milliseconds: 250));
     await Future.delayed(const Duration(milliseconds: 250));
 
 // Fix: same spacing logic
-const int scrLabelX2 = 3;
+const int scrLabelX2 = 10; // ← was 3, now matches first innings
 const int slashX2 = 100;
 const int wicketsX2 = 112;
 final int runsX2 = (78 - (runs.length * 10) ~/ 2).clamp(52, 90);
@@ -3270,6 +3278,9 @@ Future<void> _updateLEDAfterScore() async {
     final bowlerRuns  = currentBowler!.runsConceded.toString();
     final bowlerOvers = currentBowler!.overs.toStringAsFixed(1);
 
+    // Fresh bowler name padded to exactly 7 chars
+    final bowlerName  = trunc(bowlerPlayer?.teamName, 7).padRight(7).substring(0, 7);
+
     final row74IsStriker = strikeBatsman!.playerId == _row74PlayerId;
 
     final row74Player = row74IsStriker ? strikerPlayer    : nonStrikerPlayer;
@@ -3288,43 +3299,53 @@ Future<void> _updateLEDAfterScore() async {
                            _lastRow74WasStriker != row74IsStriker;
     _lastRow74WasStriker = row74IsStriker;
 
-   // ── Score: fix erase zone to not overlap SCR: label ──
-// SCR: at x=3, scale=2, 4 chars = 48px → ends at x=51
-// Runs zone: erase from x=52 to x=99 (47px wide)
-final int runsX = (78 - (runs.length * 10) ~/ 2).clamp(52, 90);
+    final int runsX = (78 - (runs.length * 10) ~/ 2).clamp(52, 90);
 
-final List<String> allCommands = [
-  // ── Score ─────────────────────────────────────────────────────
-  // Erase only the runs zone (x=52 to x=99), NOT the SCR: label
-  'CHANGE 52  30 48 14 2 0 0 0 ',
-  'CHANGE $runsX 30 ${runs.length * 12} 14 2 255 255 255 $runs',
-  // Wickets: fixed position
-  'CHANGE 112 30 16 14 2 255 255 255 $wickets',
+    final List<String> allCommands = [
 
-// ── CRR + Overs ───────────────────────────────────────────────
-'CHANGE 29 50 30 10 1 255 255 0 $crr',
-'CHANGE 90 50 46 10 1 0 255 0 $overs(${currentMatch!.overs})',
+      // ── Score (y=30, scale=2) ──────────────────────────────────────
+      // Erase only runs zone x=52..99 — SCR: label at x=3..51 untouched
+      'CHANGE 52  30 48 14 2 0 0 0 ',
+      'CHANGE $runsX 30 ${runs.length * 12} 14 2 255 255 255 $runs',
+      // Wickets fixed at x=112
+      'CHANGE 112 30 16 14 2 255 255 255 $wickets',
 
-// ── Bowler stats ──────────────────────────────────────────────────────
-// First: erase the ENTIRE bowler stats zone in one shot
-'CHANGE 56 60 71 10 1 0 0 0 ',
-// Then redraw each part
-'CHANGE 56  60 12 10 1 0 255 0 $bowlerWkts',
-'CHANGE 64  60 6  10 1 0 255 0 /',
-'CHANGE 70  60 20 10 1 0 255 0 $bowlerRuns',
-'CHANGE 90  60 6  10 1 0 255 0 (',
-'CHANGE 96  60 24 10 1 0 255 0 $bowlerOvers',
-'CHANGE 120 60 6  10 1 0 255 0 )',
+      // ── CRR + Overs (y=50) ────────────────────────────────────────
+      'CHANGE 29 50 30 10 1 255 255 0 $crr',
+      'CHANGE 90 50 46 10 1 0 255 0 $overs(${currentMatch!.overs})',
 
-  // ── Batsman rows ──────────────────────────────────────────────
-  'CHANGE 8  74 48 10 1 200 255 255 $row74Name',
-  'CHANGE 58 74 69 10 1 200 255 200 $row74Runs($row74Balls)',
-  'CHANGE 8  84 48 10 1 200 200 255 $row84Name',
-  'CHANGE 58 84 69 10 1 200 255 200 $row84Runs($row84Balls)',
-];
+      // ── Bowler name (y=60, x=10, 7 chars × 6px = 42px) ──────────
+      // Erase name zone then redraw
+      'CHANGE 10 60 42 10 1 0 0 0 ',
+      'CHANGE 10 60 42 10 1 255 200 200 $bowlerName',
+
+      // ── Bowler stats — THREE targeted erases, static chars untouched ──
+      //
+      // Wickets: x=56, width=6px (1 digit × 6px) → erases x=56..61
+      // Slash `/` painted at x=64 → 2px gap ✅ NEVER touched
+      'CHANGE 56 60 6  10 1 0 0 0 ',
+      'CHANGE 56 60 6  10 1 0 255 0 $bowlerWkts',
+
+      // Runs: x=70, width=18px (max 3 digits × 6px) → erases x=70..87
+      // Open bracket `(` painted at x=90 → 2px gap ✅ NEVER touched
+      'CHANGE 70 60 18 10 1 0 0 0 ',
+      'CHANGE 70 60 18 10 1 0 255 0 $bowlerRuns',
+
+      // Overs: x=96, width=18px (max 3 chars × 6px e.g. "9.5") → erases x=96..113
+      // Close bracket `)` painted at x=116 → 2px gap ✅ NEVER touched
+      'CHANGE 96 60 18 10 1 0 0 0 ',
+      'CHANGE 96 60 18 10 1 0 255 0 $bowlerOvers',
+
+      // ── Batsman rows (y=74 and y=84) ──────────────────────────────
+      'CHANGE 8  74 48 10 1 200 255 255 $row74Name',
+      'CHANGE 58 74 69 10 1 200 255 200 $row74Runs($row74Balls)',
+      'CHANGE 8  84 48 10 1 200 200 255 $row84Name',
+      'CHANGE 58 84 69 10 1 200 255 200 $row84Runs($row84Balls)',
+    ];
+
     await bleService.sendRawCommands(allCommands);
 
-    // ── Star: only move if striker changed ────────────────────────────
+    // ── Star indicator: only redraw if striker end changed ────────
     if (starMoved) {
       await Future.delayed(const Duration(milliseconds: 30));
       if (row74IsStriker) {
@@ -3341,13 +3362,14 @@ final List<String> allCommands = [
     }
 
     debugPrint('✅ LED updated — $runs/$wickets ($overs) CRR:$crr | '
-               'Bowler: $bowlerWkts/$bowlerRuns($bowlerOvers) | '
+               'Bowler: [$bowlerName] $bowlerWkts/$bowlerRuns($bowlerOvers) | '
                'row74IsStriker=$row74IsStriker | starMoved=$starMoved');
 
   } catch (e) {
     debugPrint('❌ _updateLEDAfterScore failed: $e');
   }
 }
+
 Future<void> _updateLEDTimeAndTemp() async {
   try {
     final bleService = BleManagerService();
