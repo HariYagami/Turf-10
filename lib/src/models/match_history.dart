@@ -1,22 +1,24 @@
 import 'package:TURF_TOWN_/src/models/objectbox.g.dart';
 import 'package:objectbox/objectbox.dart';
+import 'package:flutter/foundation.dart';
 import 'objectbox_helper.dart';
+import 'innings.dart';
 
 @Entity()
 class MatchHistory {
   @Id()
-  int id; // Auto-incremented by ObjectBox
+  int id;
 
   @Unique()
-  String matchId; // Foreign key to match
+  String matchId;
 
-  String teamAId; // Foreign key to team A
-  String teamBId; // Foreign key to team B
+  String teamAId;
+  String teamBId;
 
   @Property(type: PropertyType.date)
   DateTime matchDate;
-  
-  String matchType; // e.g., 'CRICKET'
+
+  String matchType;
 
   int team1Runs;
   int team1Wickets;
@@ -26,19 +28,19 @@ class MatchHistory {
   int team2Wickets;
   double team2Overs;
 
-  String result; // e.g., 'Team A won by 5 wickets'
+  String result;
   bool isCompleted;
 
-  // NEW FIELDS FOR SAVE/RESUME FUNCTIONALITY
-  bool isPaused; // Track if match was paused/quit halfway
-  String? pausedState; // JSON string storing complete match state when paused
+  bool isPaused;
+  bool isOnProgress; // true when app was closed/interrupted mid-match
 
-  // NEW FIELDS FOR MATCH TIMING
-  @Property(type: PropertyType.date)
-  DateTime? matchStartTime; // Track when match started
+  String? pausedState;
 
   @Property(type: PropertyType.date)
-  DateTime? matchEndTime; // Track when match completed
+  DateTime? matchStartTime;
+
+  @Property(type: PropertyType.date)
+  DateTime? matchEndTime;
 
   MatchHistory({
     this.id = 0,
@@ -56,14 +58,16 @@ class MatchHistory {
     required this.result,
     required this.isCompleted,
     this.isPaused = false,
+    this.isOnProgress = false,
     this.pausedState,
-    this.matchStartTime, // NEW
-    this.matchEndTime, // NEW
+    this.matchStartTime,
+    this.matchEndTime,
   });
 
-  // Static methods for database operations
+  // ── Static methods ────────────────────────────────────────────────────────
 
-  /// Create a new match history
+  /// Safe upsert: updates existing entry if matchId exists, creates new if not.
+  /// This prevents UniqueViolationException and ensures each match has its own entry.
   static MatchHistory create({
     required String matchId,
     required String teamAId,
@@ -79,10 +83,39 @@ class MatchHistory {
     required String result,
     required bool isCompleted,
     bool isPaused = false,
+    bool isOnProgress = false,
     String? pausedState,
-    DateTime? matchStartTime, // NEW
-    DateTime? matchEndTime, // NEW
+    DateTime? matchStartTime,
+    DateTime? matchEndTime,
   }) {
+    final existing = getByMatchId(matchId);
+
+    if (existing != null) {
+      existing.teamAId = teamAId;
+      existing.teamBId = teamBId;
+      existing.matchDate = matchDate;
+      existing.matchType = matchType;
+      existing.team1Runs = team1Runs;
+      existing.team1Wickets = team1Wickets;
+      existing.team1Overs = team1Overs;
+      existing.team2Runs = team2Runs;
+      existing.team2Wickets = team2Wickets;
+      existing.team2Overs = team2Overs;
+      existing.result = result;
+      existing.isCompleted = isCompleted;
+      existing.isPaused = isPaused;
+      existing.isOnProgress = isOnProgress;
+      if (pausedState != null) existing.pausedState = pausedState;
+      // Never overwrite matchStartTime if already set — preserve original start
+      if (existing.matchStartTime == null && matchStartTime != null) {
+        existing.matchStartTime = matchStartTime;
+      }
+      if (matchEndTime != null) existing.matchEndTime = matchEndTime;
+      ObjectBoxHelper.matchHistoryBox.put(existing);
+      debugPrint('✅ MatchHistory upserted (updated): matchId=$matchId');
+      return existing;
+    }
+
     final matchHistory = MatchHistory(
       matchId: matchId,
       teamAId: teamAId,
@@ -98,13 +131,41 @@ class MatchHistory {
       result: result,
       isCompleted: isCompleted,
       isPaused: isPaused,
+      isOnProgress: isOnProgress,
       pausedState: pausedState,
-      matchStartTime: matchStartTime, // NEW
-      matchEndTime: matchEndTime, // NEW
+      matchStartTime: matchStartTime,
+      matchEndTime: matchEndTime,
     );
 
     ObjectBoxHelper.matchHistoryBox.put(matchHistory);
+    debugPrint('✅ MatchHistory created (new): matchId=$matchId');
     return matchHistory;
+  }
+
+  /// Clean up ghost entries that are neither paused nor completed nor on-progress.
+  /// - Entries with no innings data are deleted entirely.
+  /// - Entries with valid innings data but wrong flags are corrected to isOnProgress=true.
+  static void cleanupStaleEntries() {
+    final all = ObjectBoxHelper.matchHistoryBox.getAll();
+    for (final entry in all) {
+      if (!entry.isCompleted && !entry.isPaused && !entry.isOnProgress) {
+        final innings = Innings.getFirstInnings(entry.matchId);
+        if (innings == null) {
+          // Completely orphaned entry — no innings data — delete it
+          ObjectBoxHelper.matchHistoryBox.remove(entry.id);
+          debugPrint(
+            '🗑️ Deleted orphaned ghost entry: matchId=${entry.matchId}',
+          );
+        } else {
+          // Has innings data but wrong flags — correct to on-progress
+          entry.isOnProgress = true;
+          entry.isPaused = false;
+          entry.result = 'Match Interrupted';
+          ObjectBoxHelper.matchHistoryBox.put(entry);
+          debugPrint('🧹 Fixed stale entry to isOnProgress: matchId=${entry.matchId}');
+        }
+      }
+    }
   }
 
   /// Get all match histories
@@ -122,10 +183,13 @@ class MatchHistory {
     return matchHistory;
   }
 
-  /// Get completed matches only (excludes paused matches)
-  static List<MatchHistory> getAllCompleted() {
+  /// Get on-progress matches (app was closed/interrupted mid-match)
+  static List<MatchHistory> getOnProgressMatches() {
     final query = ObjectBoxHelper.matchHistoryBox
-        .query(MatchHistory_.isCompleted.equals(true) & MatchHistory_.isPaused.equals(false))
+        .query(
+          MatchHistory_.isOnProgress.equals(true) &
+              MatchHistory_.isCompleted.equals(false),
+        )
         .order(MatchHistory_.matchDate, flags: Order.descending)
         .build();
     final matches = query.find();
@@ -133,10 +197,28 @@ class MatchHistory {
     return matches;
   }
 
-  /// NEW: Get paused matches only
+  /// Get paused matches only (user explicitly saved and exited)
   static List<MatchHistory> getPausedMatches() {
     final query = ObjectBoxHelper.matchHistoryBox
-        .query(MatchHistory_.isPaused.equals(true))
+        .query(
+          MatchHistory_.isPaused.equals(true) &
+              MatchHistory_.isOnProgress.equals(false) &
+              MatchHistory_.isCompleted.equals(false),
+        )
+        .order(MatchHistory_.matchDate, flags: Order.descending)
+        .build();
+    final matches = query.find();
+    query.close();
+    return matches;
+  }
+
+  /// Get completed matches only (excludes paused and on-progress matches)
+  static List<MatchHistory> getAllCompleted() {
+    final query = ObjectBoxHelper.matchHistoryBox
+        .query(
+          MatchHistory_.isCompleted.equals(true) &
+              MatchHistory_.isPaused.equals(false),
+        )
         .order(MatchHistory_.matchDate, flags: Order.descending)
         .build();
     final matches = query.find();
@@ -152,14 +234,18 @@ class MatchHistory {
   /// Get matches by team
   static List<MatchHistory> getMatchesByTeam(String teamId) {
     final query = ObjectBoxHelper.matchHistoryBox
-        .query(MatchHistory_.teamAId.equals(teamId).or(MatchHistory_.teamBId.equals(teamId)))
+        .query(
+          MatchHistory_.teamAId
+              .equals(teamId)
+              .or(MatchHistory_.teamBId.equals(teamId)),
+        )
         .build();
     final matches = query.find();
     query.close();
     return matches;
   }
 
-  // Instance methods
+  // ── Instance methods ──────────────────────────────────────────────────────
 
   /// Save the current match history
   void save() {
@@ -171,22 +257,34 @@ class MatchHistory {
     ObjectBoxHelper.matchHistoryBox.remove(id);
   }
 
-  /// NEW: Mark match as completed and remove paused state
+  /// Mark match as completed and remove paused/on-progress state
   void markAsCompleted(String finalResult) {
     isCompleted = true;
     isPaused = false;
+    isOnProgress = false;
     pausedState = null;
     result = finalResult;
-    matchEndTime = DateTime.now(); // NEW: Set end time
+    matchEndTime = DateTime.now();
     save();
   }
 
-  /// NEW: Mark match as paused with state
+  /// Mark match as paused with state (user explicitly saved and exited)
   void markAsPaused(String stateJson) {
     isPaused = true;
+    isOnProgress = false; // explicit save is NOT on-progress
     isCompleted = false;
     pausedState = stateJson;
     result = 'Match Paused';
+    save();
+  }
+
+  /// Mark match as on-progress (app was interrupted/closed mid-match)
+  void markAsOnProgress(String stateJson) {
+    isOnProgress = true;
+    isPaused = false;
+    isCompleted = false;
+    pausedState = stateJson;
+    result = 'Match Interrupted';
     save();
   }
 }

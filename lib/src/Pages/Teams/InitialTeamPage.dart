@@ -193,16 +193,17 @@ void didChangeDependencies() {
     }
     
     // Navigate to SelectPlayersPage
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SelectPlayersPage(
-          battingTeamName: battingTeamName,
-          bowlingTeamName: bowlingTeamName,
-          totalOvers: overs,
-        ),
-      ),
-    );
+  Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => SelectPlayersPage(
+      battingTeamName: battingTeamName,
+      bowlingTeamName: bowlingTeamName,
+      totalOvers: overs,
+      matchId: match.matchId, // 🔥 ADD THIS
+    ),
+  ),
+);
     
   } catch (e) {
     _showSnackBar('Error creating match: $e', Colors.red);

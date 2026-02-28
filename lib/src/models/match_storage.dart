@@ -144,42 +144,48 @@ class MatchStorage {
     final match = Match.getByMatchId(matchId);
     if (match == null) return 'Match not found';
 
-    final tossDecision = match.isBattingFirst ? 'chose to bat' : 'chose to bowl';
+    final tossDecision = match.isBattingFirst
+        ? 'chose to bat'
+        : 'chose to bowl';
     final battingTeam = match.getBattingTeamId();
     final bowlingTeam = match.getBowlingTeamId();
-    
+
     return '${match.matchId}: ${match.teamId1} vs ${match.teamId2}\n'
-           'Overs: ${match.overs}\n'
-           'Toss: ${match.tossWonBy} won and $tossDecision\n'
-           'Batting: $battingTeam | Bowling: $bowlingTeam\n'
-           'No-ball: ${match.isNoballAllowed ? "Allowed" : "Not Allowed"} | '
-           'Wide: ${match.isWideAllowed ? "Allowed" : "Not Allowed"}';
+        'Overs: ${match.overs}\n'
+        'Toss: ${match.tossWonBy} won and $tossDecision\n'
+        'Batting: $battingTeam | Bowling: $bowlingTeam\n'
+        'No-ball: ${match.isNoballAllowed ? "Allowed" : "Not Allowed"} | '
+        'Wide: ${match.isWideAllowed ? "Allowed" : "Not Allowed"}';
   }
 
   /// Check if a match exists
   static bool matchExists(String matchId) {
     return Match.getByMatchId(matchId) != null;
   }
+
   static Match? getByMatchId(String matchId) {
-  return Match.getByMatchId(matchId);
-}
+    return Match.getByMatchId(matchId);
+  }
 
   /// Get head-to-head statistics between two teams
-  static Map<String, dynamic> getHeadToHeadStats(String teamId1, String teamId2) {
+  static Map<String, dynamic> getHeadToHeadStats(
+    String teamId1,
+    String teamId2,
+  ) {
     final matches = Match.getByBothTeams(teamId1, teamId2);
-    
+
     int team1TossWins = 0;
     int team2TossWins = 0;
     int team1BattedFirst = 0;
     int team2BattedFirst = 0;
-    
+
     for (final match in matches) {
       if (match.tossWonBy == teamId1) {
         team1TossWins++;
       } else {
         team2TossWins++;
       }
-      
+
       final battingTeam = match.getBattingTeamId();
       if (battingTeam == teamId1) {
         team1BattedFirst++;
@@ -187,7 +193,7 @@ class MatchStorage {
         team2BattedFirst++;
       }
     }
-    
+
     return {
       'totalMatches': matches.length,
       'team1': teamId1,
@@ -202,13 +208,13 @@ class MatchStorage {
   /// Get team statistics
   static Map<String, dynamic> getTeamStats(String teamId) {
     final matches = Match.getByTeamId(teamId);
-    
+
     int tossesWon = 0;
     int choseToBat = 0;
     int choseToBowl = 0;
     int battedFirst = 0;
     int bowledFirst = 0;
-    
+
     for (final match in matches) {
       if (match.tossWonBy == teamId) {
         tossesWon++;
@@ -218,14 +224,14 @@ class MatchStorage {
           choseToBowl++;
         }
       }
-      
+
       if (match.getBattingTeamId() == teamId) {
         battedFirst++;
       } else {
         bowledFirst++;
       }
     }
-    
+
     return {
       'teamId': teamId,
       'totalMatches': matches.length,
@@ -252,9 +258,11 @@ class MatchStorage {
   }
 
   /// Batch create matches
-  static List<Match> batchCreateMatches(List<Map<String, dynamic>> matchDataList) {
+  static List<Match> batchCreateMatches(
+    List<Map<String, dynamic>> matchDataList,
+  ) {
     List<Match> createdMatches = [];
-    
+
     for (var matchData in matchDataList) {
       try {
         final match = createMatch(
@@ -271,7 +279,7 @@ class MatchStorage {
         print('Error creating match: $e');
       }
     }
-    
+
     return createdMatches;
   }
 }

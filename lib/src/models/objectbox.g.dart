@@ -520,7 +520,7 @@ final _entities = <obx_int.ModelEntity>[
   obx_int.ModelEntity(
     id: const obx_int.IdUid(10, 5806601655359689055),
     name: 'MatchHistory',
-    lastPropertyId: const obx_int.IdUid(18, 8521639436395831779),
+    lastPropertyId: const obx_int.IdUid(19, 5870124533273910192),
     flags: 0,
     properties: <obx_int.ModelProperty>[
       obx_int.ModelProperty(
@@ -630,6 +630,12 @@ final _entities = <obx_int.ModelEntity>[
         id: const obx_int.IdUid(18, 8521639436395831779),
         name: 'matchEndTime',
         type: 10,
+        flags: 0,
+      ),
+      obx_int.ModelProperty(
+        id: const obx_int.IdUid(19, 5870124533273910192),
+        name: 'isOnProgress',
+        type: 1,
         flags: 0,
       ),
     ],
@@ -1404,7 +1410,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         final pausedStateOffset = object.pausedState == null
             ? null
             : fbb.writeString(object.pausedState!);
-        fbb.startTable(19);
+        fbb.startTable(20);
         fbb.addInt64(0, object.id);
         fbb.addOffset(1, matchIdOffset);
         fbb.addOffset(2, teamAIdOffset);
@@ -1423,6 +1429,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
         fbb.addOffset(15, pausedStateOffset);
         fbb.addInt64(16, object.matchStartTime?.millisecondsSinceEpoch);
         fbb.addInt64(17, object.matchEndTime?.millisecondsSinceEpoch);
+        fbb.addBool(18, object.isOnProgress);
         fbb.finish(fbb.endTable());
         return object.id;
       },
@@ -1511,6 +1518,12 @@ obx_int.ModelDefinition getObjectBoxModel() {
           32,
           false,
         );
+        final isOnProgressParam = const fb.BoolReader().vTableGet(
+          buffer,
+          rootOffset,
+          40,
+          false,
+        );
         final pausedStateParam = const fb.StringReader(
           asciiOptimization: true,
         ).vTableGetNullable(buffer, rootOffset, 34);
@@ -1536,6 +1549,7 @@ obx_int.ModelDefinition getObjectBoxModel() {
           result: resultParam,
           isCompleted: isCompletedParam,
           isPaused: isPausedParam,
+          isOnProgress: isOnProgressParam,
           pausedState: pausedStateParam,
           matchStartTime: matchStartTimeParam,
           matchEndTime: matchEndTimeParam,
@@ -1997,5 +2011,10 @@ class MatchHistory_ {
   /// See [MatchHistory.matchEndTime].
   static final matchEndTime = obx.QueryDateProperty<MatchHistory>(
     _entities[7].properties[17],
+  );
+
+  /// See [MatchHistory.isOnProgress].
+  static final isOnProgress = obx.QueryBooleanProperty<MatchHistory>(
+    _entities[7].properties[18],
   );
 }

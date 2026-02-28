@@ -16,18 +16,19 @@ class SelectPlayersPage extends StatefulWidget {
   final String battingTeamName;
   final String bowlingTeamName;
   final int totalOvers;
+  final String matchId; // 🔥 ADD THIS
 
   const SelectPlayersPage({
     super.key,
     required this.battingTeamName,
     required this.bowlingTeamName,
     required this.totalOvers,
+    required this.matchId, // 🔥 ADD THIS
   });
 
   @override
   State<SelectPlayersPage> createState() => _SelectPlayersPageState();
 }
-
 class _SelectPlayersPageState extends State<SelectPlayersPage> {
   String? selectedStriker;
   String? selectedNonStriker;
@@ -53,49 +54,51 @@ class _SelectPlayersPageState extends State<SelectPlayersPage> {
   }
 
   Future<void> _loadMatchAndPlayers() async {
-    try {
-      // Get the most recent match (the one just created)
-      final allMatches = MatchStorage.getAllMatches();
-      if (allMatches.isEmpty) {
-        _showSnackBar('No match found', Colors.red);
-        setState(() => isLoadingPlayers = false);
-        return;
-      }
-      
-      // Sort by matchId descending to get the latest match
-      allMatches.sort((a, b) => b.matchId.compareTo(a.matchId));
-      final currentMatch = allMatches.first;
-      currentMatchId = currentMatch.matchId;
-      
-      // Get batting and bowling team IDs from the match
-      battingTeamId = currentMatch.getBattingTeamId();
-      bowlingTeamId = currentMatch.getBowlingTeamId();
-      
-      // Load players for both teams
-      if (battingTeamId != null) {
-        battingPlayers = PlayerStorage.getPlayersByTeam(battingTeamId!);
-      }
-      
-      if (bowlingTeamId != null) {
-        bowlingPlayers = PlayerStorage.getPlayersByTeam(bowlingTeamId!);
-      }
-      
-      // Validate that teams have players
-      if (battingPlayers.isEmpty) {
-        _showSnackBar('Batting team has no players!', Colors.orange);
-      }
-      
-      if (bowlingPlayers.isEmpty) {
-        _showSnackBar('Bowling team has no players!', Colors.orange);
-      }
-      
+  try {
+    // 🔥 FIX: Use the matchId passed from TeamPage instead of fetching latest
+    currentMatchId = widget.matchId;
+
+    final currentMatch = MatchStorage.getByMatchId(currentMatchId!);
+    if (currentMatch == null) {
+      _showSnackBar('Match not found: $currentMatchId', Colors.red);
       setState(() => isLoadingPlayers = false);
-      
-    } catch (e) {
-      _showSnackBar('Error loading players: $e', Colors.red);
-      setState(() => isLoadingPlayers = false);
+      return;
     }
+
+    // Get batting and bowling team IDs from the match
+    battingTeamId = currentMatch.getBattingTeamId();
+    bowlingTeamId = currentMatch.getBowlingTeamId();
+
+    debugPrint('✅ SelectPlayersPage: matchId=$currentMatchId | '
+        'battingTeamId=$battingTeamId | bowlingTeamId=$bowlingTeamId');
+
+    // Load players for both teams
+    if (battingTeamId != null) {
+      battingPlayers = PlayerStorage.getPlayersByTeam(battingTeamId!);
+    }
+
+    if (bowlingTeamId != null) {
+      bowlingPlayers = PlayerStorage.getPlayersByTeam(bowlingTeamId!);
+    }
+
+    debugPrint('✅ Batting players: ${battingPlayers.length} | '
+        'Bowling players: ${bowlingPlayers.length}');
+
+    if (battingPlayers.isEmpty) {
+      _showSnackBar('Batting team has no players!', Colors.orange);
+    }
+
+    if (bowlingPlayers.isEmpty) {
+      _showSnackBar('Bowling team has no players!', Colors.orange);
+    }
+
+    setState(() => isLoadingPlayers = false);
+
+  } catch (e) {
+    _showSnackBar('Error loading players: $e', Colors.red);
+    setState(() => isLoadingPlayers = false);
   }
+}
 
   void _showSnackBar(String message, Color backgroundColor) {
     ScaffoldMessenger.of(context).showSnackBar(

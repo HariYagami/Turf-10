@@ -42,7 +42,7 @@ class CricketScorerScreen extends StatefulWidget {
   State<CricketScorerScreen> createState() => _CricketScorerScreenState();
 }
 
-class _CricketScorerScreenState extends State<CricketScorerScreen> {
+class _CricketScorerScreenState extends State<CricketScorerScreen> with WidgetsBindingObserver {
   late Match? currentMatch;
   late Innings? currentInnings;
   late Score? currentScore;
@@ -77,27 +77,44 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> {
   bool _showDuckAnimation = false;
   String? _lastDuckBatsman;
   bool _showRunoutHighlight = false;
+  Set<String> _cancelledBatsmanIds = {};
   bool? _lastRow74WasStriker; // null = not yet set (first update)
   int _runoutHighlightIndex = 0;
   bool _showVictoryAnimation = false;
   String? _row74PlayerId;
   // Runout mode blur and highlight - light blur (0.3) with teal tint
   bool _isRunoutModeActive = false;
+
   // Helper method to determine banner border color
-// Helper method to determine banner border color
-Color _getTargetBannerColor() {
-  // Check for tie first
-  if (currentScore!.totalRuns == currentInnings!.targetRuns - 1) {
-    return const Color(0xFFFF9800); // Orange for tie
-  } else if (currentScore!.totalRuns >= currentInnings!.targetRuns) {
-    // Target met - Team B won
-    return const Color(0xFF4CAF50); // Green
-  } else if (_isInningsComplete() || currentScore!.wickets >= 9) {
-    // Match ended without reaching target - Team A won
-    return const Color(0xFF4CAF50); // Green (showing Team A victory)
-  } else {
-    // Still chasing
-    return const Color(0xFFFF9800); // Orange
+  Color _getTargetBannerColor() {
+    // Check for tie first
+    if (currentScore!.totalRuns == currentInnings!.targetRuns - 1) {
+      return const Color(0xFFFF9800); // Orange for tie
+    } else if (currentScore!.totalRuns >= currentInnings!.targetRuns) {
+      // Target met - Team B won
+      return const Color(0xFF4CAF50); // Green
+    } else if (_isInningsComplete() || currentScore!.wickets >= 9) {
+      // Match ended without reaching target - Team A won
+      return const Color(0xFF4CAF50); // Green (showing Team A victory)
+    } else {
+      // Still chasing
+      return const Color(0xFFFF9800); // Orange
+    }
+  }
+
+@override
+void didChangeAppLifecycleState(AppLifecycleState state) {
+  super.didChangeAppLifecycleState(state);
+  
+  if (state == AppLifecycleState.paused || 
+      state == AppLifecycleState.detached ||
+      state == AppLifecycleState.inactive) {
+    
+    // Only auto-save if match is still in progress
+    if (!isMatchComplete && !isInitializing) {
+      debugPrint('📱 App lifecycle: $state — auto-saving match state...');
+      _autoSaveMatchState();
+    }
   }
 }
 
@@ -232,9 +249,11 @@ List<Map<String, dynamic>> actionHistory = [];
 void initState() {
   super.initState();
   _scrollController = ScrollController();
+  WidgetsBinding.instance.addObserver(this); // ADD THIS
   
   print('🚀 CricketScorerScreen: Initializing EnvironmentService...');
   _envService.initialize();
+
 
   // Test weather API after a short delay
   Future.delayed(const Duration(seconds: 1), () {
@@ -247,15 +266,12 @@ void initState() {
   // 🔥 FIX: Initialize match WITHOUT immediate LED drawing
   _initializeMatch();
 }
-
 @override
 void dispose() {
+  WidgetsBinding.instance.removeObserver(this); // ADD THIS
   _scrollController.dispose();
-  
-  // Cancel periodic timer
   _ledUpdateTimer?.cancel();
   debugPrint('⏹️ Stopped periodic time/temp updates');
-  
   super.dispose();
 }
 
@@ -286,48 +302,70 @@ Future<void> _initializeMatch() async {
       currentScore!.save();
     }
 
+    // 🔥 FIX: Always ensure a MatchHistory entry exists from the very start
+    // so closing the app mid-match always shows up in history
+ final existingHistory = MatchHistory.getByMatchId(widget.matchId);
+if (existingHistory == null) {
+  MatchHistory.create(
+    matchId: widget.matchId,
+    teamAId: currentMatch!.teamId1,
+    teamBId: currentMatch!.teamId2,
+    matchDate: DateTime.now(),
+    matchType: 'CRICKET',
+    team1Runs: 0,
+    team1Wickets: 0,
+    team1Overs: 0.0,
+    team2Runs: 0,
+    team2Wickets: 0,
+    team2Overs: 0.0,
+    result: 'Match Paused',
+    isCompleted: false,
+    isPaused: true,
+    matchStartTime: DateTime.now(),
+  );
+  debugPrint('📋 Created initial MatchHistory entry for match: ${widget.matchId}');
+} else {
+  // 🔥 Only update matchStartTime if missing
+  // Never overwrite pausedState or isPaused for a resumed match
+  if (existingHistory.matchStartTime == null) {
+    existingHistory.matchStartTime = DateTime.now();
+    existingHistory.save();
+    debugPrint('📋 Updated matchStartTime for existing entry');
+  }
+  debugPrint('📋 Resuming existing match — keeping existing paused state intact');
+}
+// NOTE: Do NOT reset isPaused here for resumed matches.
+// The match stays isPaused=true while in progress.
+// Only _updateMatchToHistory() and _updateMatchTiedToHistory() set isPaused=false (on completion).
+
     setState(() => isInitializing = false);
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     final isSecond = currentInnings!.isSecondInnings;
-    
+
     await _waitForBluetoothConnection();
-    
-    
+
     await Future.delayed(const Duration(milliseconds: 100));
-    
+
     debugPrint('🧹 Clearing display before drawing layout (double clear)...');
     final bleService = BleManagerService();
-    
+
     if (bleService.isConnected) {
-      // 🔥 REDUCED: Two clears instead of three, shorter delays
       debugPrint('🧹 CLEAR 1/2');
       await bleService.sendRawCommands(['CLEAR']);
       await Future.delayed(const Duration(milliseconds: 100));
-      
+
       debugPrint('🧹 CLEAR 2/2');
       await bleService.sendRawCommands(['CLEAR']);
-      
-      // 🔥 REDUCED: From 4 seconds to 1.5 seconds
-      debugPrint('⏳ Waiting 1.5 seconds for display to stabilize...');
       await Future.delayed(const Duration(milliseconds: 100));
-      
+
       debugPrint('✅ Display cleared and stabilized - ready to draw');
     } else {
       debugPrint('⚠️ BLE not connected - skipping clear');
     }
-    
-    // 🔥 REDUCED: From 1000ms to 300ms
-    debugPrint('⏳ Waiting 300ms before sending layout...');
+
     await Future.delayed(const Duration(milliseconds: 100));
-    
-    // Save match start time
-    final existingHistory = MatchHistory.getByMatchId(widget.matchId);
-    if (existingHistory != null && existingHistory.matchStartTime == null) {
-      existingHistory.matchStartTime = DateTime.now();
-      existingHistory.save();
-    }  
-    
+
     debugPrint('🎨 Starting layout render...');
     if (isSecond) {
       await _sendSecondInningsIntroLayout();
@@ -340,7 +378,6 @@ Future<void> _initializeMatch() async {
     _showErrorDialog('Failed to load match: $e');
   }
 }
-
 
 
 // 🔥 NEW: Helper method to wait for Bluetooth connection
@@ -550,12 +587,12 @@ await bleService.sendRawCommands([
 await Future.delayed(Duration(milliseconds: delayPerCommand));
 
 await bleService.sendRawCommands([
-  'TEXT 56  60 1 0 255 0 $bowlerWkts',
-  'TEXT 64  60 1 0 255 0 /',
-  'TEXT 70  60 1 0 255 0 $bowlerRuns',
-  'TEXT 90  60 1 0 255 0 (',
-  'TEXT 96  60 1 0 255 0 $bowlerOvers',
-  'TEXT 116 60 1 0 255 0 )',
+  'TEXT 58  60 1 0 255 0 $bowlerWkts',
+  'TEXT 66  60 1 0 255 0 /',
+  'TEXT 74  60 1 0 255 0 $bowlerRuns',
+  'TEXT 94  60 1 0 255 0 (',
+  'TEXT 102 60 1 0 255 0 $bowlerOvers',
+  'TEXT 122 60 1 0 255 0 )',
 ]);
 await Future.delayed(Duration(milliseconds: delayPerCommand));
 
@@ -649,6 +686,108 @@ void _updateMatchTiedToHistory(Score firstInningsScore) {
     );
     
     matchHistory.save();
+  }
+}
+void _autoSaveMatchState() {
+  try {
+    if (currentMatch == null || currentInnings == null || currentScore == null) {
+      debugPrint('⚠️ Auto-save skipped: match data not available');
+      return;
+    }
+
+    final firstInnings = Innings.getFirstInnings(widget.matchId);
+    final secondInnings = Innings.getSecondInnings(widget.matchId);
+    final firstScore = firstInnings != null
+        ? Score.getByInningsId(firstInnings.inningsId)
+        : null;
+    final secondScore = secondInnings != null
+        ? Score.getByInningsId(secondInnings.inningsId)
+        : null;
+
+    // 🔥 FIX: Use widget IDs as reliable fallback (score IDs may be empty on first ball)
+    final String strikerId = currentScore!.strikeBatsmanId.isNotEmpty
+        ? currentScore!.strikeBatsmanId
+        : widget.strikeBatsmanId;
+    final String nonStrikerId = currentScore!.nonStrikeBatsmanId.isNotEmpty
+        ? currentScore!.nonStrikeBatsmanId
+        : widget.nonStrikeBatsmanId;
+    final String bowlerIdStr = currentScore!.currentBowlerId.isNotEmpty
+        ? currentScore!.currentBowlerId
+        : widget.bowlerId;
+
+    final matchStateJson = jsonEncode({
+      'matchId': widget.matchId,
+      'inningsId': widget.inningsId,
+      'strikeBatsmanId': strikerId,
+      'nonStrikeBatsmanId': nonStrikerId,
+      'bowlerId': bowlerIdStr,
+      'firstInningsId': firstInnings?.inningsId,
+      'firstInningsTeamId': firstInnings?.battingTeamId,
+      'firstInningsRuns': firstScore?.totalRuns ?? 0,
+      'firstInningsWickets': firstScore?.wickets ?? 0,
+      'firstInningsOvers': firstScore?.overs ?? 0.0,
+      'firstInningsExtras': firstScore?.totalExtras ?? 0,
+      'secondInningsId': secondInnings?.inningsId,
+      'secondInningsTeamId': secondInnings?.battingTeamId,
+      'secondInningsRuns': secondScore?.totalRuns ?? 0,
+      'secondInningsWickets': secondScore?.wickets ?? 0,
+      'secondInningsOvers': secondScore?.overs ?? 0.0,
+      'secondInningsExtras': secondScore?.totalExtras ?? 0,
+      'secondInningsTarget': secondInnings?.targetRuns ?? 0,
+      'isCompleted': false,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    final existingHistory = MatchHistory.getByMatchId(widget.matchId);
+
+    if (existingHistory != null) {
+      existingHistory.isPaused = true;
+      existingHistory.pausedState = matchStateJson;
+      existingHistory.result = 'Match Paused';
+      existingHistory.isCompleted = false;
+      existingHistory.team1Runs = firstScore?.totalRuns ?? existingHistory.team1Runs;
+      existingHistory.team1Wickets = firstScore?.wickets ?? existingHistory.team1Wickets;
+      existingHistory.team1Overs = firstScore?.overs ?? existingHistory.team1Overs;
+      existingHistory.team2Runs = secondScore?.totalRuns ?? existingHistory.team2Runs;
+      existingHistory.team2Wickets = secondScore?.wickets ?? existingHistory.team2Wickets;
+      existingHistory.team2Overs = secondScore?.overs ?? existingHistory.team2Overs;
+      existingHistory.matchDate = DateTime.now();
+      existingHistory.matchEndTime = DateTime.now();
+      existingHistory.save();
+
+      // 🔥 FIX: Verify save actually persisted
+      final verify = MatchHistory.getByMatchId(widget.matchId);
+      debugPrint('✅ Auto-save verified — isPaused=${verify?.isPaused}, result=${verify?.result}, pausedState length=${verify?.pausedState?.length ?? 0}');
+    } else {
+      final DateTime startTime = DateTime.now();
+      MatchHistory.create(
+        matchId: widget.matchId,
+        teamAId: currentMatch!.teamId1,
+        teamBId: currentMatch!.teamId2,
+        matchDate: DateTime.now(),
+        matchType: 'CRICKET',
+        team1Runs: firstScore?.totalRuns ?? 0,
+        team1Wickets: firstScore?.wickets ?? 0,
+        team1Overs: firstScore?.overs ?? 0.0,
+        team2Runs: secondScore?.totalRuns ?? 0,
+        team2Wickets: secondScore?.wickets ?? 0,
+        team2Overs: secondScore?.overs ?? 0.0,
+        result: 'Match Paused',
+        isCompleted: false,
+        isPaused: true,
+        pausedState: matchStateJson,
+        matchStartTime: startTime,
+      );
+
+      // 🔥 FIX: Verify new entry was created
+      final verify = MatchHistory.getByMatchId(widget.matchId);
+      debugPrint('✅ Auto-save created new entry — id=${verify?.id}, isPaused=${verify?.isPaused}');
+    }
+
+    debugPrint('✅ Match auto-saved as paused. strikerId=$strikerId, bowler=$bowlerIdStr');
+
+  } catch (e) {
+    debugPrint('❌ Auto-save failed: $e');
   }
 }
 
@@ -963,15 +1102,15 @@ await Future.delayed(const Duration(milliseconds: 250));
     await Future.delayed(const Duration(milliseconds: 250));
 
 // Replace in _sendSecondInningsIntroLayout:
- final paddedBowlerName2 = bowlerName.padRight(7).substring(0, 7);
+final paddedBowlerName2 = bowlerName.padRight(7).substring(0, 7);
 await bleService.sendRawCommands([
   'TEXT 10  60 1 255 200 200 $paddedBowlerName2',
-  'TEXT 56  60 1 0 255 0 $bowlerWkts',
-  'TEXT 64  60 1 0 255 0 /',
-  'TEXT 70  60 1 0 255 0 $bowlerRuns',
-  'TEXT 90  60 1 0 255 0 (',
-  'TEXT 96  60 1 0 255 0 $bowlerOvers',
-  'TEXT 116 60 1 0 255 0 )',
+  'TEXT 58  60 1 0 255 0 $bowlerWkts',
+  'TEXT 66  60 1 0 255 0 /',
+  'TEXT 74  60 1 0 255 0 $bowlerRuns',
+  'TEXT 94  60 1 0 255 0 (',
+  'TEXT 102 60 1 0 255 0 $bowlerOvers',
+  'TEXT 122 60 1 0 255 0 )',
 ]);
 await Future.delayed(const Duration(milliseconds: 250));
 
@@ -1217,15 +1356,29 @@ void _saveMatchState() {
 
     final firstInnings = Innings.getFirstInnings(widget.matchId);
     final secondInnings = Innings.getSecondInnings(widget.matchId);
-    final firstScore = firstInnings != null ? Score.getByInningsId(firstInnings.inningsId) : null;
-    final secondScore = secondInnings != null ? Score.getByInningsId(secondInnings.inningsId) : null;
+    final firstScore = firstInnings != null
+        ? Score.getByInningsId(firstInnings.inningsId)
+        : null;
+    final secondScore = secondInnings != null
+        ? Score.getByInningsId(secondInnings.inningsId)
+        : null;
+
+    final String strikerId = currentScore!.strikeBatsmanId.isNotEmpty
+        ? currentScore!.strikeBatsmanId
+        : widget.strikeBatsmanId;
+    final String nonStrikerId = currentScore!.nonStrikeBatsmanId.isNotEmpty
+        ? currentScore!.nonStrikeBatsmanId
+        : widget.nonStrikeBatsmanId;
+    final String bowlerIdStr = currentScore!.currentBowlerId.isNotEmpty
+        ? currentScore!.currentBowlerId
+        : widget.bowlerId;
 
     final matchStateJson = jsonEncode({
       'matchId': widget.matchId,
       'inningsId': widget.inningsId,
-      'strikeBatsmanId': widget.strikeBatsmanId,
-      'nonStrikeBatsmanId': widget.nonStrikeBatsmanId,
-      'bowlerId': widget.bowlerId,
+      'strikeBatsmanId': strikerId,
+      'nonStrikeBatsmanId': nonStrikerId,
+      'bowlerId': bowlerIdStr,
       'firstInningsId': firstInnings?.inningsId,
       'firstInningsTeamId': firstInnings?.battingTeamId,
       'firstInningsRuns': firstScore?.totalRuns ?? 0,
@@ -1243,70 +1396,52 @@ void _saveMatchState() {
       'timestamp': DateTime.now().toIso8601String(),
     });
 
-    // 🔥 CRITICAL: Clear LED with proper delay, then save
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      await _clearLEDDisplay();
-      
-      // Wait for clear to complete before saving
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      if (!mounted) return;
+    // 🔥 Single safe upsert call — updates if exists, creates if not
+    // Each matchId gets its own entry, so different matches never overwrite each other
+    MatchHistory.create(
+      matchId: widget.matchId,
+      teamAId: currentMatch!.teamId1,
+      teamBId: currentMatch!.teamId2,
+      matchDate: DateTime.now(),
+      matchType: 'CRICKET',
+      team1Runs: firstScore?.totalRuns ?? 0,
+      team1Wickets: firstScore?.wickets ?? 0,
+      team1Overs: firstScore?.overs ?? 0.0,
+      team2Runs: secondScore?.totalRuns ?? 0,
+      team2Wickets: secondScore?.wickets ?? 0,
+      team2Overs: secondScore?.overs ?? 0.0,
+      result: 'Match Paused',
+      isCompleted: false,
+      isPaused: true,
+      pausedState: matchStateJson,
+      matchEndTime: DateTime.now(),
+    );
 
-      final existingHistory = MatchHistory.getByMatchId(widget.matchId);
+    final verify = MatchHistory.getByMatchId(widget.matchId);
+    debugPrint('✅ SaveMatchState — matchId=${widget.matchId}, '
+        'isPaused=${verify?.isPaused}, '
+        'pausedState length=${verify?.pausedState?.length ?? 0}');
 
-      if (existingHistory != null) {
-        existingHistory.isPaused = true;
-        existingHistory.pausedState = matchStateJson;
-        existingHistory.result = 'Match Paused';
-        existingHistory.isCompleted = false;
-        existingHistory.team1Runs = firstScore?.totalRuns ?? 0;
-        existingHistory.team1Wickets = firstScore?.wickets ?? 0;
-        existingHistory.team1Overs = firstScore?.overs ?? 0.0;
-        existingHistory.team2Runs = secondScore?.totalRuns ?? 0;
-        existingHistory.team2Wickets = secondScore?.wickets ?? 0;
-        existingHistory.team2Overs = secondScore?.overs ?? 0.0;
-        existingHistory.matchDate = DateTime.now();
-        existingHistory.save();
-      } else {
-        MatchHistory.create(
-          matchId: widget.matchId,
-          teamAId: currentMatch!.teamId1,
-          teamBId: currentMatch!.teamId2,
-          matchDate: DateTime.now(),
-          matchType: 'CRICKET',
-          team1Runs: firstScore?.totalRuns ?? 0,
-          team1Wickets: firstScore?.wickets ?? 0,
-          team1Overs: firstScore?.overs ?? 0.0,
-          team2Runs: secondScore?.totalRuns ?? 0,
-          team2Wickets: secondScore?.wickets ?? 0,
-          team2Overs: secondScore?.overs ?? 0.0,
-          result: 'Match Paused',
-          isCompleted: false,
-          isPaused: true,
-          pausedState: matchStateJson,
-        );
-      }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Match saved! You can resume it later.'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      ),
+    );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Match saved! You can resume it later.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-
+    final navigator = Navigator.of(context);
+    _clearLEDDisplay().then((_) {
       Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          Navigator.of(context).pop();
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const TeamPage()),
-            (route) => false,
-          );
-        }
+        navigator.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const TeamPage()),
+          (route) => false,
+        );
       });
     });
+
   } catch (e) {
-    print('Error saving match state: $e');
+    debugPrint('❌ Error saving match state: $e');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Error saving match: $e'),
@@ -1315,8 +1450,6 @@ void _saveMatchState() {
     );
   }
 }
-
-
 
 void _updateMatchToHistory(bool battingTeamWon, Score firstInningsScore) {
   if (currentMatch == null || currentInnings == null || currentScore == null) return;
@@ -1550,7 +1683,6 @@ Future.delayed(const Duration(milliseconds: 1000), () async {
 }
 
 void _showLeaveMatchDialog() {
-  // Dismiss blur overlay when back button is pressed
   setState(() {
     _isRunoutModeActive = false;
   });
@@ -1576,7 +1708,7 @@ void _showLeaveMatchDialog() {
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.of(context).pop(), // Close dialog
+          onPressed: () => Navigator.of(context).pop(),
           child: const Text(
             'Continue Match',
             style: TextStyle(color: Color(0xFF9AA0A6)),
@@ -1588,15 +1720,8 @@ void _showLeaveMatchDialog() {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           ),
           onPressed: () {
-            Navigator.of(context).pop(); // Close dialog
-            
-            // 🔥 CLEAR LED DISPLAY BEFORE SAVING AND EXITING
-            _clearLEDDisplay();
-            
-            // Give time for LED to clear before saving
-            Future.delayed(const Duration(milliseconds: 500), () {
-              _saveMatchState(); // This will save and navigate
-            });
+            Navigator.of(context).pop(); // Close dialog only
+            _saveMatchState();           // Save directly, no extra delay
           },
           child: const Text(
             'Save & Exit',
@@ -1606,7 +1731,6 @@ void _showLeaveMatchDialog() {
             ),
           ),
         ),
-        // CHANGED: Only show "Discard & Exit" if NOT resumed
         if (!widget.isResumed)
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -1614,29 +1738,20 @@ void _showLeaveMatchDialog() {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             ),
             onPressed: () {
-              // 🔥 CRITICAL: Capture navigator BEFORE any async operations
               final navigator = Navigator.of(context);
-              
-              // Close dialog
               navigator.pop();
-              
-              // Mark match as complete to freeze buttons
               if (mounted) {
                 setState(() {
                   isMatchComplete = true;
                 });
               }
-              
-              // 🔥 FIXED: Clear LED but DON'T disconnect Bluetooth
-              _clearLEDDisplay();
-              
-              // Navigate after LED clears
-              Future.delayed(const Duration(milliseconds: 600), () {
-                // Use captured navigator (safe even if widget unmounted)
-                navigator.pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const TeamPage()),
-                  (route) => false,
-                );
+              _clearLEDDisplay().then((_) {
+                Future.delayed(const Duration(milliseconds: 400), () {
+                  navigator.pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const TeamPage()),
+                    (route) => false,
+                  );
+                });
               });
             },
             child: const Text(
@@ -1651,8 +1766,6 @@ void _showLeaveMatchDialog() {
     ),
   );
 }
-
-
 
 void addRuns(int runs) {
   if (currentScore == null || strikeBatsman == null || currentBowler == null) return;
@@ -1863,23 +1976,26 @@ void addRuns(int runs) {
 
   // 🔥 Save state BEFORE making any changes
   final savedAction = {
-    'type': 'wicket',
-    'strikeBatsmanId': strikeBatsman!.batId,
-    'nonStrikeBatsmanId': nonStrikeBatsman!.batId,
-    'batsmanIsOut': strikeBatsman!.isOut,
-    'batsmanBowlerWhoGotWicket': strikeBatsman!.bowlerIdWhoGotWicket,
-    'batsmanExtras': strikeBatsman!.extras,
-    'bowlerWickets': currentBowler!.wickets,
-    'bowlerBalls': currentBowler!.balls,
-    'bowlerRuns': currentBowler!.runsConceded,
-    'bowlerMaidens': currentBowler!.maidens,
-    'bowlerExtras': currentBowler!.extras,
-    'runsInCurrentOver': runsInCurrentOver,
-    'wickets': currentScore!.wickets,
-    'currentBall': currentScore!.currentBall,
-    'currentOver': List<String>.from(currentScore!.currentOver),
-  };
-
+  'type': 'wicket',
+  'strikeBatsmanId': strikeBatsman!.batId,
+  'nonStrikeBatsmanId': nonStrikeBatsman!.batId,
+  'scoreStrikeBatsmanId': currentScore!.strikeBatsmanId,
+  'scoreNonStrikeBatsmanId': currentScore!.nonStrikeBatsmanId,
+  'batsmanIsOut': strikeBatsman!.isOut,
+  'batsmanBowlerWhoGotWicket': strikeBatsman!.bowlerIdWhoGotWicket,
+  'batsmanExtras': strikeBatsman!.extras,
+  'bowlerWickets': currentBowler!.wickets,
+  'bowlerBalls': currentBowler!.balls,
+  'bowlerRuns': currentBowler!.runsConceded,
+  'bowlerMaidens': currentBowler!.maidens,
+  'bowlerExtras': currentBowler!.extras,
+  'runsInCurrentOver': runsInCurrentOver,
+  'wickets': currentScore!.wickets,
+  'currentBall': currentScore!.currentBall,
+  'overs': currentScore!.overs,           // 🔥 FIX: was missing
+  'currentOver': List<String>.from(currentScore!.currentOver),
+  // 🔥 newBatsmanBatId will be added dynamically after selection in dialog
+};
   setState(() {
     actionHistory.add(savedAction);
 
@@ -1963,6 +2079,10 @@ void _undoWicket(Map<String, dynamic> savedAction) {
 
     strikeBatsman = Batsman.getByBatId(savedAction['strikeBatsmanId']);
     nonStrikeBatsman = Batsman.getByBatId(savedAction['nonStrikeBatsmanId']);
+
+    // 🔥 FIX: Restore score's internal batsman ID pointers
+    currentScore!.strikeBatsmanId = savedAction['scoreStrikeBatsmanId'];
+    currentScore!.nonStrikeBatsmanId = savedAction['scoreNonStrikeBatsmanId'];
 
     // Restore bowler state
     if (currentBowler != null) {
@@ -2248,10 +2368,17 @@ void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
   );
 
   final teamPlayers = TeamMember.getByTeamId(currentInnings!.battingTeamId);
-  final playersWhoBatted = allBatsmenInInnings.map((b) => b.playerId).toSet();
-  final availablePlayers = teamPlayers.where((p) =>
-    !playersWhoBatted.contains(p.playerId)
-  ).toList();
+
+  // 🔥 FIX: Exclude batsmen whose Batsman record was cancelled by a prior undo
+  // Without this, undone new-batsman records still block their playerId from the dropdown
+  final playersWhoBatted = allBatsmenInInnings
+      .where((b) => !_cancelledBatsmanIds.contains(b.batId))
+      .map((b) => b.playerId)
+      .toSet();
+
+  final availablePlayers = teamPlayers
+      .where((p) => !playersWhoBatted.contains(p.playerId))
+      .toList();
 
   if (availablePlayers.isEmpty) {
     currentScore!.save();
@@ -2263,7 +2390,6 @@ void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
     context: context,
     barrierDismissible: false,
     builder: (context) => WillPopScope(
-      // 🔥 Intercept back button to trigger cancel
       onWillPop: () async {
         Navigator.of(context).pop();
         onCancel?.call();
@@ -2276,7 +2402,6 @@ void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
             const Expanded(
               child: Text('Select Next Batsman', style: TextStyle(color: Colors.white)),
             ),
-            // 🔥 X button to cancel
             IconButton(
               icon: const Icon(Icons.close, color: Colors.white54),
               onPressed: () {
@@ -2296,19 +2421,33 @@ void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
                 padding: EdgeInsets.symmetric(vertical: 8.0),
                 child: Text(
                   'Available Batsmen:',
-                  style: TextStyle(color: Color(0xFF6D7CFF), fontWeight: FontWeight.bold, fontSize: 12),
+                  style: TextStyle(
+                    color: Color(0xFF6D7CFF),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
                 ),
               ),
               ...availablePlayers.map((player) {
                 return ListTile(
                   title: Text(player.teamName, style: const TextStyle(color: Colors.white)),
-                  subtitle: Text('ID: ${player.playerId}', style: const TextStyle(color: Color(0xFF8F9499))),
+                  subtitle: Text(
+                    'ID: ${player.playerId}',
+                    style: const TextStyle(color: Color(0xFF8F9499)),
+                  ),
                   onTap: () {
                     final newBatsman = Batsman.create(
                       inningsId: currentInnings!.inningsId,
                       teamId: currentInnings!.battingTeamId,
                       playerId: player.playerId,
                     );
+
+                    // 🔥 FIX: Store the new batsman's batId in the wicket action so
+                    // _performUndo can mark it as cancelled and restore the dropdown
+                    if (actionHistory.isNotEmpty &&
+                        actionHistory.last['type'] == 'wicket') {
+                      actionHistory.last['newBatsmanBatId'] = newBatsman.batId;
+                    }
 
                     setState(() {
                       strikeBatsman = newBatsman;
@@ -2324,7 +2463,6 @@ void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
             ],
           ),
         ),
-        // 🔥 Cancel button in actions
         actions: [
           TextButton(
             onPressed: () {
@@ -2341,7 +2479,6 @@ void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {
     ),
   );
 }
-
  void _showChangeBowlerDialog() {
   if (currentInnings == null) return;
 
@@ -3087,15 +3224,9 @@ void swapPlayers() {
         currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
       }
 
-      if (lastAction.containsKey('byes')) {
-        currentScore!.byes = lastAction['byes'];
-      }
-      if (lastAction.containsKey('wides')) {
-        currentScore!.wides = lastAction['wides'];
-      }
-      if (lastAction.containsKey('noBalls')) {
-        currentScore!.noBalls = lastAction['noBalls'];
-      }
+      if (lastAction.containsKey('byes')) currentScore!.byes = lastAction['byes'];
+      if (lastAction.containsKey('wides')) currentScore!.wides = lastAction['wides'];
+      if (lastAction.containsKey('noBalls')) currentScore!.noBalls = lastAction['noBalls'];
 
       currentScore!.totalRuns = lastAction['totalRuns'];
       currentScore!.currentBall = lastAction['currentBall'];
@@ -3110,11 +3241,12 @@ void swapPlayers() {
       isNoBall = false;
       isWide = false;
       isByes = false;
-      
+
     } else if (actionType == 'wicket') {
       final strikerBatId = lastAction['strikeBatsmanId'];
       final nonStrikerBatId = lastAction['nonStrikeBatsmanId'];
-      
+
+      // Restore original batsman's out-state
       final batsman = Batsman.getByBatId(strikerBatId);
       if (batsman != null) {
         batsman.isOut = lastAction['batsmanIsOut'];
@@ -3122,47 +3254,67 @@ void swapPlayers() {
         batsman.extras = lastAction['batsmanExtras'];
         batsman.save();
       }
-      
+
       strikeBatsman = Batsman.getByBatId(strikerBatId);
       nonStrikeBatsman = Batsman.getByBatId(nonStrikerBatId);
 
+      // Restore score's internal batsman ID pointers
+      if (lastAction.containsKey('scoreStrikeBatsmanId')) {
+        currentScore!.strikeBatsmanId = lastAction['scoreStrikeBatsmanId'];
+      }
+      if (lastAction.containsKey('scoreNonStrikeBatsmanId')) {
+        currentScore!.nonStrikeBatsmanId = lastAction['scoreNonStrikeBatsmanId'];
+      }
+
+      // Restore bowler state
       if (currentBowler != null) {
         currentBowler!.wickets = lastAction['bowlerWickets'];
         currentBowler!.balls = lastAction['bowlerBalls'];
         currentBowler!.runsConceded = lastAction['bowlerRuns'];
         currentBowler!.maidens = lastAction['bowlerMaidens'];
         currentBowler!.extras = lastAction['bowlerExtras'];
-        
+
         int completedOvers = currentBowler!.balls ~/ 6;
         int remainingBalls = currentBowler!.balls % 6;
         currentBowler!.overs = completedOvers + (remainingBalls / 10.0);
-        
+
         double totalOvers = completedOvers + (remainingBalls / 6.0);
-        currentBowler!.economy = totalOvers > 0 ? (currentBowler!.runsConceded / totalOvers) : 0.0;
-        
+        currentBowler!.economy =
+            totalOvers > 0 ? (currentBowler!.runsConceded / totalOvers) : 0.0;
+
         currentBowler!.save();
         currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
       }
 
-      if (lastAction.containsKey('byes')) {
-        currentScore!.byes = lastAction['byes'];
-      }
-      if (lastAction.containsKey('wides')) {
-        currentScore!.wides = lastAction['wides'];
-      }
-      if (lastAction.containsKey('noBalls')) {
-        currentScore!.noBalls = lastAction['noBalls'];
-      }
+      if (lastAction.containsKey('byes')) currentScore!.byes = lastAction['byes'];
+      if (lastAction.containsKey('wides')) currentScore!.wides = lastAction['wides'];
+      if (lastAction.containsKey('noBalls')) currentScore!.noBalls = lastAction['noBalls'];
 
       currentScore!.wickets = lastAction['wickets'];
       currentScore!.currentBall = lastAction['currentBall'];
+
+      // 🔥 FIX: Restore overs (was missing — ball count changes on wicket)
+      if (lastAction.containsKey('overs')) {
+        currentScore!.overs = lastAction['overs'];
+      }
+
       currentScore!.currentOver = List<String>.from(lastAction['currentOver']);
-      currentScore!.crr = currentScore!.overs > 0 ? (currentScore!.totalRuns / currentScore!.overs) : 0.0;
-      
+      currentScore!.crr = currentScore!.overs > 0
+          ? (currentScore!.totalRuns / currentScore!.overs)
+          : 0.0;
+
       if (lastAction.containsKey('runsInCurrentOver')) {
         runsInCurrentOver = lastAction['runsInCurrentOver'];
       }
-      
+
+      // 🔥 FIX: If a new batsman was selected before undo, mark their batId
+      // as cancelled so _showSelectNextBatsmanDialog excludes their DB record
+      // from the "already batted" filter — making the player reappear in dropdown
+      if (lastAction.containsKey('newBatsmanBatId')) {
+        _cancelledBatsmanIds.add(lastAction['newBatsmanBatId'] as String);
+        debugPrint('↩️ Undo wicket: cancelled new batsman ${lastAction['newBatsmanBatId']}');
+      }
+
     } else if (actionType == 'runout') {
       final strikerBatId = lastAction['strikeBatsmanId'];
       final strikerBat = Batsman.getByBatId(strikerBatId);
@@ -3228,7 +3380,6 @@ void swapPlayers() {
     currentScore!.save();
 
     // 🔥 Force star to re-evaluate its position after undo
-    // (strike may have swapped back, so we can't assume previous direction)
     _lastRow74WasStriker = null;
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -3243,6 +3394,7 @@ void swapPlayers() {
   // 🔥 Update LED OUTSIDE setState so it runs after state is fully committed
   _updateLEDAfterScore();
 }
+
 Future<void> _updateLEDAfterScore() async {
   try {
     final bleService = BleManagerService();
@@ -3319,22 +3471,19 @@ Future<void> _updateLEDAfterScore() async {
       'CHANGE 10 60 42 10 1 0 0 0 ',
       'CHANGE 10 60 42 10 1 255 200 200 $bowlerName',
 
-      // ── Bowler stats — THREE targeted erases, static chars untouched ──
-      //
-      // Wickets: x=56, width=6px (1 digit × 6px) → erases x=56..61
-      // Slash `/` painted at x=64 → 2px gap ✅ NEVER touched
-      'CHANGE 56 60 6  10 1 0 0 0 ',
-      'CHANGE 56 60 6  10 1 0 255 0 $bowlerWkts',
+    // ── Bowler stats — targeted erases aligned to TEXT positions ──
+//
+// Wickets: x=58, width=6px → ends x=63. Slash at x=66 (2px gap) ✓ NEVER touched
+'CHANGE 58 60 6  10 1 0 0 0 ',
+'CHANGE 58 60 6  10 1 0 255 0 $bowlerWkts',
 
-      // Runs: x=70, width=18px (max 3 digits × 6px) → erases x=70..87
-      // Open bracket `(` painted at x=90 → 2px gap ✅ NEVER touched
-      'CHANGE 70 60 18 10 1 0 0 0 ',
-      'CHANGE 70 60 18 10 1 0 255 0 $bowlerRuns',
+// Runs: x=74, width=18px → ends x=91. Bracket ( at x=94 (2px gap) ✓ NEVER touched
+'CHANGE 74 60 18 10 1 0 0 0 ',
+'CHANGE 74 60 18 10 1 0 255 0 $bowlerRuns',
 
-      // Overs: x=96, width=18px (max 3 chars × 6px e.g. "9.5") → erases x=96..113
-      // Close bracket `)` painted at x=116 → 2px gap ✅ NEVER touched
-      'CHANGE 96 60 18 10 1 0 0 0 ',
-      'CHANGE 96 60 18 10 1 0 255 0 $bowlerOvers',
+// Overs: x=102, width=18px → ends x=119. Bracket ) at x=122 (2px gap) ✓ NEVER touched
+'CHANGE 102 60 18 10 1 0 0 0 ',
+'CHANGE 102 60 18 10 1 0 255 0 $bowlerOvers',
 
       // ── Batsman rows (y=74 and y=84) ──────────────────────────────
       'CHANGE 8  74 48 10 1 200 255 255 $row74Name',
