@@ -106,11 +106,11 @@ class _CricketScorerScreenState extends State<CricketScorerScreen> with WidgetsB
 void didChangeAppLifecycleState(AppLifecycleState state) {
   super.didChangeAppLifecycleState(state);
   
-  if (state == AppLifecycleState.paused || 
+  if (state == AppLifecycleState.inactive ||  // ADD inactive
+      state == AppLifecycleState.paused || 
       state == AppLifecycleState.detached ||
-      state == AppLifecycleState.inactive) {
+      state == AppLifecycleState.hidden) {    // ADD hidden (Flutter 3.13+)
     
-    // Only auto-save if match is still in progress
     if (!isMatchComplete && !isInitializing) {
       debugPrint('📱 App lifecycle: $state — auto-saving match state...');
       _autoSaveMatchState();
@@ -304,7 +304,7 @@ Future<void> _initializeMatch() async {
 
     // 🔥 FIX: Always ensure a MatchHistory entry exists from the very start
     // so closing the app mid-match always shows up in history
- final existingHistory = MatchHistory.getByMatchId(widget.matchId);
+final existingHistory = MatchHistory.getByMatchId(widget.matchId);
 if (existingHistory == null) {
   MatchHistory.create(
     matchId: widget.matchId,
@@ -318,21 +318,23 @@ if (existingHistory == null) {
     team2Runs: 0,
     team2Wickets: 0,
     team2Overs: 0.0,
-    result: 'Match Paused',
+    result: 'Match Interrupted',
     isCompleted: false,
-    isPaused: true,
+    isPaused: false,
+    isOnProgress: true,        // NEW
     matchStartTime: DateTime.now(),
   );
   debugPrint('📋 Created initial MatchHistory entry for match: ${widget.matchId}');
 } else {
-  // 🔥 Only update matchStartTime if missing
-  // Never overwrite pausedState or isPaused for a resumed match
+  // When resuming, reset to isOnProgress=true so it shows in OnProgress tab
+  existingHistory.isOnProgress = true;   // NEW
+  existingHistory.isPaused = false;      // Clear paused — it's active again
+  existingHistory.result = 'Match Interrupted';
   if (existingHistory.matchStartTime == null) {
     existingHistory.matchStartTime = DateTime.now();
-    existingHistory.save();
-    debugPrint('📋 Updated matchStartTime for existing entry');
   }
-  debugPrint('📋 Resuming existing match — keeping existing paused state intact');
+  existingHistory.save();
+  debugPrint('📋 Resuming match — reset to isOnProgress=true');
 }
 // NOTE: Do NOT reset isPaused here for resumed matches.
 // The match stays isPaused=true while in progress.
@@ -655,6 +657,7 @@ void _updateMatchTiedToHistory(Score firstInningsScore) {
   if (existingHistory != null) {
   existingHistory.isCompleted = true;
   existingHistory.isPaused = false;
+  existingHistory.isOnProgress = false;  
   existingHistory.pausedState = null;
   existingHistory.result = 'Match Tied';
   existingHistory.team1Runs = firstInningsScore.totalRuns;
@@ -741,9 +744,10 @@ void _autoSaveMatchState() {
     final existingHistory = MatchHistory.getByMatchId(widget.matchId);
 
     if (existingHistory != null) {
-      existingHistory.isPaused = true;
-      existingHistory.pausedState = matchStateJson;
-      existingHistory.result = 'Match Paused';
+     existingHistory.isPaused = false;         // NOT user-paused
+existingHistory.isOnProgress = true;      // App closed mid-match
+existingHistory.pausedState = matchStateJson;
+existingHistory.result = 'Match Interrupted';
       existingHistory.isCompleted = false;
       existingHistory.team1Runs = firstScore?.totalRuns ?? existingHistory.team1Runs;
       existingHistory.team1Wickets = firstScore?.wickets ?? existingHistory.team1Wickets;
@@ -772,9 +776,10 @@ void _autoSaveMatchState() {
         team2Runs: secondScore?.totalRuns ?? 0,
         team2Wickets: secondScore?.wickets ?? 0,
         team2Overs: secondScore?.overs ?? 0.0,
-        result: 'Match Paused',
-        isCompleted: false,
-        isPaused: true,
+      result: 'Match Interrupted',
+isCompleted: false,
+isPaused: false,
+isOnProgress: true,
         pausedState: matchStateJson,
         matchStartTime: startTime,
       );
@@ -1413,6 +1418,7 @@ void _saveMatchState() {
       result: 'Match Paused',
       isCompleted: false,
       isPaused: true,
+      isOnProgress: false, 
       pausedState: matchStateJson,
       matchEndTime: DateTime.now(),
     );
@@ -1494,6 +1500,7 @@ void _updateMatchToHistory(bool battingTeamWon, Score firstInningsScore) {
   existingHistory.result = result;
   existingHistory.team1Runs = firstInningsScore.totalRuns;
   existingHistory.team1Wickets = firstInningsScore.wickets;
+  existingHistory.isOnProgress = false; 
   existingHistory.team1Overs = firstInningsScore.overs;
   existingHistory.team2Runs = currentScore!.totalRuns;
   existingHistory.team2Wickets = currentScore!.wickets;
@@ -2230,22 +2237,25 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
     if (runoutBatsman == null) return;
 
     // Store action in history
-    actionHistory.add({
+    final savedAction = {
       'type': 'runout',
       'runs': runs,
       'runoutBatsmanId': runoutBatsmanId,
       'fielderId': fielderId,
       'strikeBatsmanId': strikeBatsman!.batId,
       'nonStrikeBatsmanId': nonStrikeBatsman!.batId,
+      'scoreStrikeBatsmanId': currentScore!.strikeBatsmanId,      // 🔥 ADD
+      'scoreNonStrikeBatsmanId': currentScore!.nonStrikeBatsmanId, // 🔥 ADD
       'strikerRuns': strikeBatsman!.runs,
       'strikerBalls': strikeBatsman!.ballsFaced,
       'strikerFours': strikeBatsman!.fours,
       'strikerSixes': strikeBatsman!.sixes,
       'strikerDotBalls': strikeBatsman!.dotBalls,
       'strikerExtras': strikeBatsman!.extras,
-      'runoutBatsmanIsOut': runoutBatsman.isOut,
+      'runoutBatsmanIsOut': runoutBatsman.isOut,           // 🔥 SNAPSHOT BEFORE markAsOut
       'runoutBatsmanDismissalType': runoutBatsman.dismissalType,
       'runoutBatsmanFielderId': runoutBatsman.fielderIdWhoRanOut,
+      'runoutBatsmanRuns': runoutBatsman.runs,             // 🔥 ADD for duck check restore
       'bowlerRuns': currentBowler!.runsConceded,
       'bowlerBalls': currentBowler!.balls,
       'bowlerWickets': currentBowler!.wickets,
@@ -2257,7 +2267,9 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
       'overs': currentScore!.overs,
       'currentOver': List<String>.from(currentScore!.currentOver),
       'runsInCurrentOver': runsInCurrentOver,
-    });
+    };
+
+    actionHistory.add(savedAction);
 
     // Update striker's stats with runs
     strikeBatsman!.updateStats(runs, extrasRuns: 0, countBall: true);
@@ -2293,7 +2305,6 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
     currentScore!.crr = currentScore!.overs > 0 ? (currentScore!.totalRuns / currentScore!.overs) : 0.0;
     currentScore!.save();
 
-    // UPDATE LED DISPLAY - ADD THIS
     _updateLEDAfterScore();
 
     runsInCurrentOver += runs;
@@ -2319,15 +2330,20 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
       if (_checkSecondInningsVictory()) return;
     }
 
-    // Show next batsman dialog if the run out batsman was one of the current batsmen
+    // 🔥 FIX: Pass onCancel to both dialog calls so cancelling rolls back the runout
     if (runoutBatsmanId == strikeBatsman!.batId) {
-      _showSelectNextBatsmanDialog();
+      // The striker got run out — non-striker becomes new striker
       setState(() {
-        // Update striker to be the non-striker
         strikeBatsman = nonStrikeBatsman;
       });
+      _showSelectNextBatsmanDialog(
+        onCancel: () => _undoRunout(savedAction),
+      );
     } else if (runoutBatsmanId == nonStrikeBatsman!.batId) {
-      _showSelectNextBatsmanDialog();
+      // The non-striker got run out — just pick replacement
+      _showSelectNextBatsmanDialog(
+        onCancel: () => _undoRunout(savedAction),
+      );
     }
 
     // Switch strike if odd runs
@@ -2357,6 +2373,99 @@ void _finalizeRunout(int runs, String runoutBatsmanId, String fielderId) {
     pendingRunoutRuns = null;
     this.runoutBatsmanId = null;
   });
+}
+void _undoRunout(Map<String, dynamic> savedAction) {
+  setState(() {
+    // Remove from action history
+    if (actionHistory.isNotEmpty && actionHistory.last['type'] == 'runout') {
+      actionHistory.removeLast();
+    }
+
+    // Restore runout batsman's out-state
+    final runoutBatId = savedAction['runoutBatsmanId'];
+    final runoutBat = Batsman.getByBatId(runoutBatId);
+    if (runoutBat != null) {
+      runoutBat.isOut = savedAction['runoutBatsmanIsOut'];
+      runoutBat.dismissalType = savedAction['runoutBatsmanDismissalType'];
+      runoutBat.fielderIdWhoRanOut = savedAction['runoutBatsmanFielderId'];
+      runoutBat.save();
+    }
+
+    // Restore striker's stats
+    final strikerBatId = savedAction['strikeBatsmanId'];
+    final strikerBat = Batsman.getByBatId(strikerBatId);
+    if (strikerBat != null) {
+      strikerBat.runs = savedAction['strikerRuns'];
+      strikerBat.ballsFaced = savedAction['strikerBalls'];
+      strikerBat.fours = savedAction['strikerFours'];
+      strikerBat.sixes = savedAction['strikerSixes'];
+      strikerBat.dotBalls = savedAction['strikerDotBalls'];
+      strikerBat.extras = savedAction['strikerExtras'];
+      strikerBat.strikeRate = strikerBat.ballsFaced > 0
+          ? (strikerBat.runs / strikerBat.ballsFaced) * 100
+          : 0.0;
+      strikerBat.save();
+    }
+
+    // Restore strikeBatsman / nonStrikeBatsman references
+    strikeBatsman = Batsman.getByBatId(savedAction['strikeBatsmanId']);
+    nonStrikeBatsman = Batsman.getByBatId(savedAction['nonStrikeBatsmanId']);
+
+    // 🔥 Restore score's internal batsman ID pointers
+    currentScore!.strikeBatsmanId = savedAction['scoreStrikeBatsmanId'];
+    currentScore!.nonStrikeBatsmanId = savedAction['scoreNonStrikeBatsmanId'];
+
+    // Restore bowler state
+    if (currentBowler != null) {
+      currentBowler!.runsConceded = savedAction['bowlerRuns'];
+      currentBowler!.balls = savedAction['bowlerBalls'];
+      currentBowler!.wickets = savedAction['bowlerWickets'];
+      currentBowler!.maidens = savedAction['bowlerMaidens'];
+      currentBowler!.extras = savedAction['bowlerExtras'];
+
+      int completedOvers = currentBowler!.balls ~/ 6;
+      int remainingBalls = currentBowler!.balls % 6;
+      currentBowler!.overs = completedOvers + (remainingBalls / 10.0);
+
+      double totalOvers = completedOvers + (remainingBalls / 6.0);
+      currentBowler!.economy =
+          totalOvers > 0 ? (currentBowler!.runsConceded / totalOvers) : 0.0;
+
+      currentBowler!.save();
+      currentBowler = Bowler.getByBowlerId(currentBowler!.bowlerId);
+    }
+
+    // Restore score state
+    currentScore!.totalRuns = savedAction['totalRuns'];
+    currentScore!.wickets = savedAction['wickets'];
+    currentScore!.currentBall = savedAction['currentBall'];
+    currentScore!.overs = savedAction['overs'];
+    currentScore!.currentOver = List<String>.from(savedAction['currentOver']);
+    currentScore!.crr = currentScore!.overs > 0
+        ? (currentScore!.totalRuns / currentScore!.overs)
+        : 0.0;
+    runsInCurrentOver = savedAction['runsInCurrentOver'];
+
+    // Reset runout mode flags
+    isRunout = false;
+    pendingRunoutRuns = null;
+    runoutBatsmanId = null;
+
+    currentScore!.save();
+
+    // 🔥 Force star re-evaluation
+    _lastRow74WasStriker = null;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Runout cancelled'),
+        duration: Duration(seconds: 2),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  });
+
+  _updateLEDAfterScore();
 }
 
 void _showSelectNextBatsmanDialog({VoidCallback? onCancel}) {

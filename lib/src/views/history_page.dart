@@ -84,23 +84,23 @@ class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
           'pausedState=${match.pausedState?.length ?? 0} chars');
     }
 
-    // 🔥 FIX: Paused = isPaused true AND not completed
-    _pausedMatches = allMatches
-        .where((match) => match.isPaused && !match.isCompleted)
-        .toList()
-      ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
+// OnProgress = app closed/interrupted mid-match
+_onProgressMatches = allMatches
+    .where((match) => match.isOnProgress && !match.isCompleted)
+    .toList()
+  ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
 
-    // 🔥 FIX: Completed = isCompleted true AND not paused
-    _completedMatches = allMatches
-        .where((match) => match.isCompleted && !match.isPaused)
-        .toList()
-      ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
+// Paused = user explicitly saved and exited
+_pausedMatches = allMatches
+    .where((match) => match.isPaused && !match.isOnProgress && !match.isCompleted)
+    .toList()
+  ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
 
-    // 🔥 FIX: onProgress should now be empty after cleanup — keep for safety
-    _onProgressMatches = allMatches
-        .where((match) => !match.isCompleted && !match.isPaused)
-        .toList()
-      ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
+// Completed = finished matches
+_completedMatches = allMatches
+    .where((match) => match.isCompleted && !match.isPaused)
+    .toList()
+  ..sort((a, b) => b.matchDate.compareTo(a.matchDate));
 
     debugPrint('📋 Paused: ${_pausedMatches.length} | '
         'OnProgress: ${_onProgressMatches.length} | '
